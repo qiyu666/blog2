@@ -25,6 +25,11 @@ export default function Header() {
               收藏
             </NavLink>
           )}
+          {user?.role === 'admin' && (
+            <NavLink to="/admin" className="nav__link nav__link--admin">
+              后台
+            </NavLink>
+          )}
           {user ? (
             <>
               <NavLink to="/mailbox" className="nav__link nav__mail">

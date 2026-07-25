@@ -10,6 +10,8 @@ import Mailbox from './pages/Mailbox';
 import NewMessage from './pages/NewMessage';
 import MessageDetail from './pages/MessageDetail';
 import Favorites from './pages/Favorites';
+import Admin from './pages/Admin';
+import Promote from './pages/Promote';
 import ProtectedRoute from './auth/ProtectedRoute';
 
 export default function App() {
@@ -65,6 +67,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Favorites />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/promote" element={<Promote />} />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <Admin />
             </ProtectedRoute>
           }
         />

@@ -162,3 +162,72 @@ export async function getUnreadCount(): Promise<number> {
     return 0;
   }
 }
+
+// ===== Admin =====
+export interface AdminUser {
+  id: number;
+  username: string;
+  email: string;
+  role: string;
+  avatar: string;
+  bio: string;
+  created_at: string;
+  posts_count: number;
+  comments_count: number;
+}
+
+export interface AdminPost {
+  id: number;
+  title: string;
+  slug: string;
+  category: string;
+  published: number;
+  views: number;
+  created_at: string;
+  updated_at: string;
+  author_username: string | null;
+  likes_count: number;
+  comments_count: number;
+}
+
+export interface AdminComment {
+  id: number;
+  content: string;
+  created_at: string;
+  post_id: number;
+  author_username: string;
+  post_title: string;
+  post_slug: string;
+}
+
+export async function getAdminUsers(): Promise<AdminUser[]> {
+  return request<AdminUser[]>('/api/admin/users');
+}
+
+export async function updateUserRole(
+  id: number,
+  role: 'member' | 'admin'
+): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/api/admin/users?id=${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function getAdminPosts(): Promise<AdminPost[]> {
+  return request<AdminPost[]>('/api/admin/posts');
+}
+
+export async function getAdminComments(): Promise<AdminComment[]> {
+  return request<AdminComment[]>('/api/admin/comments');
+}
+
+export async function promoteUser(
+  username: string,
+  secret: string
+): Promise<{ success: boolean; message: string }> {
+  return request<{ success: boolean; message: string }>('/api/admin/promote', {
+    method: 'POST',
+    body: JSON.stringify({ username, secret }),
+  });
+}
