@@ -73,7 +73,6 @@ export default function App() {
           }
         />
         <Route path="/promote" element={<Promote />} />
-        <Route path="/u/:username" element={<UserProfile />} />
         <Route
           path="/settings"
           element={
@@ -90,6 +89,8 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        {/* User profile — must be LAST to avoid shadowing fixed routes */}
+        <Route path="/:username" element={<UserProfile />} />
       </Routes>
     </Layout>
   );
