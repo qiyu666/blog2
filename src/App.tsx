@@ -12,6 +12,8 @@ import MessageDetail from './pages/MessageDetail';
 import Favorites from './pages/Favorites';
 import Admin from './pages/Admin';
 import Promote from './pages/Promote';
+import UserProfile from './pages/UserProfile';
+import Settings from './pages/Settings';
 import ProtectedRoute from './auth/ProtectedRoute';
 
 export default function App() {
@@ -71,6 +73,15 @@ export default function App() {
           }
         />
         <Route path="/promote" element={<Promote />} />
+        <Route path="/u/:username" element={<UserProfile />} />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Settings />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/admin"
           element={

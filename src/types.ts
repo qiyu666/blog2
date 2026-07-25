@@ -34,6 +34,11 @@ export interface User {
   role: string;
   avatar: string;
   bio: string;
+  display_name?: string;
+  location?: string;
+  website?: string;
+  profile_css?: string;
+  profile_bg?: string;
   created_at: string;
 }
 

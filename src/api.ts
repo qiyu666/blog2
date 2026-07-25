@@ -231,3 +231,42 @@ export async function promoteUser(
     body: JSON.stringify({ username, secret }),
   });
 }
+
+// ===== User Profile =====
+export interface UserProfile {
+  user: User;
+  posts: Post[];
+  stats: {
+    posts_count: number;
+    comments_count: number;
+    total_likes_received: number;
+    total_favorites_received: number;
+  };
+}
+
+export interface ProfileUpdate {
+  display_name?: string;
+  bio?: string;
+  avatar?: string;
+  location?: string;
+  website?: string;
+  profile_bg?: string;
+  profile_css?: string;
+}
+
+export async function getUserProfile(username: string): Promise<UserProfile> {
+  return request<UserProfile>(`/api/users/${encodeURIComponent(username)}`);
+}
+
+export async function updateProfile(
+  username: string,
+  data: ProfileUpdate
+): Promise<{ user: User; success: boolean }> {
+  return request<{ user: User; success: boolean }>(
+    `/api/users/${encodeURIComponent(username)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }
+  );
+}

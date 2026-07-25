@@ -21,7 +21,7 @@ export default function PostCard({ post }: { post: Post }) {
       </Link>
       <p className="post-card__excerpt">{post.excerpt}</p>
       <div className="post-card__meta">
-        <span className="post-card__author">@{author}</span>
+        <Link to={`/u/${author}`} className="post-card__author">@{author}</Link>
         <span>·</span>
         <span>{formatDate(post.created_at)}</span>
         <span className="post-card__stats">

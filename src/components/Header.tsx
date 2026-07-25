@@ -42,7 +42,9 @@ export default function Header() {
                 发帖
               </NavLink>
               <div className="nav__user">
-                <span className="nav__username">{user.username}</span>
+                <Link to={`/u/${user.username}`} className="nav__username">
+                  {user.display_name || user.username}
+                </Link>
                 <button onClick={handleLogout} className="nav__logout">
                   退出
                 </button>
