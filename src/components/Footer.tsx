@@ -23,7 +23,7 @@ export default function Footer() {
             <div className="site-footer__col-title">Elsewhere</div>
             <ul className="site-footer__list">
               <li><a href="https://developers.cloudflare.com/pages/" target="_blank" rel="noreferrer">Cloudflare Pages</a></li>
-              <li><a href="https://github.com" target="_blank" rel="noreferrer">GitHub</a></li>
+              <li><a href="https://github.com/qiyu666" target="_blank" rel="noreferrer">GitHub</a></li>
               <li><a href="mailto:hello@marginalia.blog">Contact</a></li>
             </ul>
           </div>
