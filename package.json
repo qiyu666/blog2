@@ -10,7 +10,9 @@
     "deploy": "npm run build && npx wrangler pages deploy ./dist --project-name=blog2",
     "db:create": "npx wrangler d1 create blog-db",
     "db:init": "npx wrangler d1 execute blog-db --file=./schema.sql",
-    "db:init:remote": "npx wrangler d1 execute blog-db --remote --file=./schema.sql"
+    "db:init:remote": "npx wrangler d1 execute blog-db --remote --file=./schema.sql",
+    "db:migrate": "npx wrangler d1 execute blog-db --file=./schema-v2.sql",
+    "db:migrate:remote": "npx wrangler d1 execute blog-db --remote --file=./schema-v2.sql"
   },
   "dependencies": {
     "react": "^18.3.1",

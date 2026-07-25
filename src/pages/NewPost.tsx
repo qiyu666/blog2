@@ -13,8 +13,8 @@ export default function NewPost() {
 
   return (
     <div className="form-page">
-      <h1 className="form-page__title">Write something worth reading.</h1>
-      <PostForm onSubmit={handleSubmit} submitLabel="Publish" />
+      <h1 className="form-page__title">写下值得阅读的内容。</h1>
+      <PostForm onSubmit={handleSubmit} submitLabel="发布" />
     </div>
   )
 }

@@ -1,13 +1,13 @@
-// GET /api/posts     → list all posts (newest first)
-// POST /api/posts    → create a new post
+// GET /api/posts        → list all posts (newest first) with stats + author
+// POST /api/posts       → create a new post (requires login)
 
 import { json, error, slugify, uniqueSlug } from './_helpers'
+import { getSession, cleanText } from './_auth'
 
 interface PostInput {
   title: string
   excerpt: string
   content: string
-  author: string
   category: string
   tags: string
   cover_image: string
@@ -17,11 +17,20 @@ export async function onRequestGet(context: { env: { DB: D1Database } }) {
   const { DB } = context.env
   try {
     const result = await DB.prepare(
-      'SELECT * FROM posts WHERE published = 1 ORDER BY created_at DESC'
+      `SELECT
+        p.id, p.title, p.slug, p.excerpt, p.content, p.author, p.category,
+        p.tags, p.cover_image, p.published, p.views, p.created_at, p.updated_at,
+        p.author_id,
+        u.username AS author_username,
+        (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS likes_count,
+        (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comments_count
+       FROM posts p
+       LEFT JOIN users u ON p.author_id = u.id
+       WHERE p.published = 1
+       ORDER BY p.created_at DESC`
     ).all()
     return json(result.results)
   } catch (err) {
-    // If the database isn't set up yet, return empty array
     if (String(err).includes('no such table')) {
       return json([])
     }
@@ -34,6 +43,11 @@ export async function onRequestPost(context: {
   env: { DB: D1Database }
 }) {
   const { request, env } = context
+  const { user } = await getSession(request, env.DB)
+  if (!user) {
+    return error('请先登录', 401)
+  }
+
   let body: PostInput
   try {
     body = await request.json()
@@ -41,32 +55,35 @@ export async function onRequestPost(context: {
     return error('Invalid JSON body')
   }
 
-  const { title, excerpt, content, author, category, tags, cover_image } = body
+  const title = cleanText(body.title, 200).trim()
+  const content = cleanText(body.content, 50000)
+  const excerpt = cleanText(body.excerpt, 500).trim() || content.slice(0, 150) + '...'
+  const category = cleanText(body.category, 50).trim() || 'General'
+  const tags = cleanText(body.tags, 200).trim()
+  const cover_image = cleanText(body.cover_image, 500).trim()
 
-  if (!title?.trim() || !content?.trim()) {
-    return error('Title and content are required')
+  if (!title || !content) {
+    return error('标题和内容不能为空')
   }
 
   const slug = await uniqueSlug(env.DB, slugify(title))
 
   try {
     const result = await env.DB.prepare(
-      `INSERT INTO posts (title, slug, excerpt, content, author, category, tags, cover_image)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO posts (title, slug, excerpt, content, author, author_id, category, tags, cover_image)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-      .bind(
-        title.trim(),
-        slug,
-        (excerpt || '').trim() || content.slice(0, 150) + '...',
-        content,
-        (author || 'Anonymous').trim(),
-        (category || 'General').trim(),
-        (tags || '').trim(),
-        (cover_image || '').trim()
-      )
+      .bind(title, slug, excerpt, content, user.username, user.id, category, tags, cover_image)
       .run()
 
-    const post = await env.DB.prepare('SELECT * FROM posts WHERE id = ?')
+    const post = await env.DB
+      .prepare(
+        `SELECT p.*, u.username AS author_username,
+          (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS likes_count,
+          (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comments_count
+         FROM posts p LEFT JOIN users u ON p.author_id = u.id
+         WHERE p.id = ?`
+      )
       .bind(result.meta.last_row_id)
       .first()
 

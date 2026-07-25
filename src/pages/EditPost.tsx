@@ -29,32 +29,31 @@ export default function EditPost() {
     navigate(`/post/${updated.slug}`)
   }
 
-  if (loading) return <div className="loading">Loading editor</div>
+  if (loading) return <div className="loading">加载中</div>
   if (!post) return (
     <div className="error-state">
-      <h2 className="error-state__title">Post not found</h2>
+      <h2 className="error-state__title">未找到帖子</h2>
       <p className="error-state__msg">
-        <Link to="/" style={{ color: 'var(--accent)' }}>← Back to the journal</Link>
+        <Link to="/" style={{ color: 'var(--accent)' }}>← 返回论坛</Link>
       </p>
     </div>
   )
 
   return (
     <div className="form-page">
-      <Link to="/" className="back-link">← Cancel</Link>
-      <h1 className="form-page__title">Revise your work.</h1>
+      <Link to="/" className="back-link">← 取消</Link>
+      <h1 className="form-page__title">编辑帖子</h1>
       <PostForm
         initial={{
           title: post.title,
           excerpt: post.excerpt,
           content: post.content,
-          author: post.author,
           category: post.category,
           tags: post.tags,
           cover_image: post.cover_image,
         }}
         onSubmit={handleSubmit}
-        submitLabel="Save Changes"
+        submitLabel="保存修改"
       />
     </div>
   )
