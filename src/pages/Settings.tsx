@@ -72,7 +72,7 @@ export default function Settings() {
 
   return (
     <div className="form-page settings">
-      <Link to={`/u/${user.username}`} className="back-link">
+      <Link to={`/${user.username}`} className="back-link">
         ← 返回我的空间
       </Link>
       <h1 className="form-page__title">编辑资料</h1>

@@ -281,7 +281,7 @@ export default function PostDetail() {
     const kids = repliesOf(c.id)
     return (
       <li key={c.id} className="comment">
-        <Link to={`/u/${c.author_username}`} className="comment__avatar">
+        <Link to={`/${c.author_username}`} className="comment__avatar">
           {c.author_avatar ? (
             <img src={c.author_avatar} alt={c.author_username} />
           ) : (
@@ -292,7 +292,7 @@ export default function PostDetail() {
         </Link>
         <div className="comment__body">
           <div className="comment__head">
-            <Link to={`/u/${c.author_username}`} className="comment__author">
+            <Link to={`/${c.author_username}`} className="comment__author">
               @{c.author_username}
             </Link>
             <span className="comment__time">{formatRelative(c.created_at)}</span>
