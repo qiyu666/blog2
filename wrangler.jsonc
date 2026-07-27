@@ -11,6 +11,8 @@
     }
   ],
   "vars": {
-    "ADMIN_SECRET": "58fd55dc4479f407ac2124cef758074a9cf3f68ffa72755d"
+    "ADMIN_SECRET": "58fd55dc4479f407ac2124cef758074a9cf3f68ffa72755d",
+    "GITHUB_CLIENT_ID": "Ov23lijgt2dwgubIOyfO",
+    "GITHUB_CLIENT_SECRET": "7ba60fe1be54677d474932244007950e0c34aa5c"
   }
 }
