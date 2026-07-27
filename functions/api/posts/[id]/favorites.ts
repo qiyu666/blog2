@@ -4,12 +4,15 @@
 
 import { json, error } from '../../_helpers'
 import { getSession } from '../../_auth'
+import { notify } from '../../_notifications'
 
 async function resolvePostId(db: D1Database, idParam: string): Promise<number | null> {
   const isNum = /^\d+$/.test(idParam)
-  const row = isNum
-    ? await db.prepare('SELECT id FROM posts WHERE id = ?').bind(idParam).first<{ id: number }>()
-    : await db.prepare('SELECT id FROM posts WHERE slug = ?').bind(idParam).first<{ id: number }>()
+  if (isNum) {
+    const row = await db.prepare('SELECT id FROM posts WHERE id = ?').bind(Number(idParam)).first<{ id: number }>()
+    if (row) return row.id
+  }
+  const row = await db.prepare('SELECT id FROM posts WHERE slug = ?').bind(idParam).first<{ id: number }>()
   return row?.id ?? null
 }
 
@@ -40,6 +43,20 @@ export async function onRequestPost(context: {
       await env.DB.prepare('INSERT INTO favorites (post_id, user_id) VALUES (?, ?)')
         .bind(postId, user.id)
         .run()
+      // 通知帖子作者被收藏
+      const owner = await env.DB
+        .prepare('SELECT author_id FROM posts WHERE id = ?')
+        .bind(postId)
+        .first<{ author_id: number | null }>()
+      if (owner?.author_id) {
+        void notify({
+          db: env.DB,
+          userId: owner.author_id,
+          actorId: user.id,
+          type: 'favorite',
+          postId,
+        })
+      }
       return json({ favorited: true, action: 'favorited' }, 201)
     }
   } catch (err) {

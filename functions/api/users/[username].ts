@@ -15,14 +15,28 @@ export async function onRequestGet(context: {
   const username = decodeURIComponent(params.username)
 
   try {
-    const user = await env.DB
-      .prepare(
-        `SELECT id, username, display_name, role, avatar, bio, location, website,
-          profile_css, profile_bg, created_at
-         FROM users WHERE username = ?`
-      )
-      .bind(username)
-      .first()
+    let user: any = null
+    try {
+      user = await env.DB
+        .prepare(
+          `SELECT id, username, display_name, role, avatar, bio, location, website,
+            profile_css, profile_bg, profile_layout, created_at
+           FROM users WHERE username = ?`
+        )
+        .bind(username)
+        .first()
+    } catch {
+      // 如果 profile_layout 列不存在，回退到旧查询
+      user = await env.DB
+        .prepare(
+          `SELECT id, username, display_name, role, avatar, bio, location, website,
+            profile_css, profile_bg, created_at
+           FROM users WHERE username = ?`
+        )
+        .bind(username)
+        .first()
+      if (user) user.profile_layout = ''
+    }
     if (!user) return error('用户不存在', 404)
 
     const posts = await env.DB
@@ -45,13 +59,26 @@ export async function onRequestGet(context: {
           (SELECT COUNT(*) FROM posts p WHERE p.author_id = ? AND p.published = 1) AS posts_count,
           (SELECT COUNT(*) FROM comments c WHERE c.user_id = ?) AS comments_count,
           (SELECT COUNT(*) FROM likes l JOIN posts p ON l.post_id = p.id WHERE p.author_id = ?) AS total_likes_received,
-          (SELECT COUNT(*) FROM favorites f JOIN posts p ON f.post_id = p.id WHERE p.author_id = ?) AS total_favorites_received
+          (SELECT COUNT(*) FROM favorites f JOIN posts p ON f.post_id = p.id WHERE p.author_id = ?) AS total_favorites_received,
+          (SELECT COUNT(*) FROM follows fl WHERE fl.follower_id = ?) AS following_count,
+          (SELECT COUNT(*) FROM follows fl WHERE fl.following_id = ?) AS followers_count
          FROM users WHERE id = ?`
       )
-      .bind(user.id, user.id, user.id, user.id, user.id)
+      .bind(user.id, user.id, user.id, user.id, user.id, user.id, user.id)
       .first()
 
-    return json({ user, posts: posts.results, stats })
+    // 当前用户是否关注了此人
+    const { user: currentUser } = await getSession(context.request, env.DB)
+    let isFollowing = false
+    if (currentUser && currentUser.id !== user.id) {
+      const row = await env.DB
+        .prepare('SELECT id FROM follows WHERE follower_id = ? AND following_id = ?')
+        .bind(currentUser.id, user.id)
+        .first()
+      isFollowing = !!row
+    }
+
+    return json({ user, posts: posts.results, stats, is_following: isFollowing })
   } catch (err) {
     return error('Failed to fetch profile: ' + String(err), 500)
   }
@@ -120,6 +147,16 @@ export async function onRequestPatch(context: {
     if (body.website !== undefined) { updates.push('website = ?'); paramsArr.push(website) }
     if (body.profile_bg !== undefined) { updates.push('profile_bg = ?'); paramsArr.push(profileBg) }
     if (body.profile_css !== undefined) { updates.push('profile_css = ?'); paramsArr.push(profileCSS) }
+    if (body.profile_layout !== undefined) {
+      // 尝试更新 profile_layout，如果列不存在则跳过
+      try {
+        await env.DB.prepare('SELECT profile_layout FROM users WHERE id = ?').bind(user.id).first()
+        updates.push('profile_layout = ?')
+        paramsArr.push(profileLayout)
+      } catch {
+        // 列不存在，跳过
+      }
+    }
 
     if (updates.length === 0) {
       return json({ success: true, message: '没有需要更新的字段' })
@@ -130,14 +167,27 @@ export async function onRequestPatch(context: {
 
     await env.DB.prepare(sql).bind(...paramsArr).run()
 
-    const updated = await env.DB
-      .prepare(
-        `SELECT id, username, display_name, email, role, avatar, bio,
-          location, website, profile_css, profile_bg, created_at
-         FROM users WHERE id = ?`
-      )
-      .bind(user.id)
-      .first()
+    let updated: any = null
+    try {
+      updated = await env.DB
+        .prepare(
+          `SELECT id, username, display_name, email, role, avatar, bio,
+            location, website, profile_css, profile_bg, profile_layout, created_at
+           FROM users WHERE id = ?`
+        )
+        .bind(user.id)
+        .first()
+    } catch {
+      updated = await env.DB
+        .prepare(
+          `SELECT id, username, display_name, email, role, avatar, bio,
+            location, website, profile_css, profile_bg, created_at
+           FROM users WHERE id = ?`
+        )
+        .bind(user.id)
+        .first()
+      if (updated) updated.profile_layout = ''
+    }
 
     return json({ user: updated, success: true })
   } catch (err) {

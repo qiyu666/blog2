@@ -1,11 +1,10 @@
 import { useEffect, useState, FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { updateProfile, type ProfileUpdate } from '../api'
+import { updateProfile, changePassword, type ProfileUpdate } from '../api'
 
 export default function Settings() {
   const { user, refreshUser } = useAuth()
-  const navigate = useNavigate()
   const [displayName, setDisplayName] = useState('')
   const [bio, setBio] = useState('')
   const [avatar, setAvatar] = useState('')
@@ -17,6 +16,13 @@ export default function Settings() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [previewCss, setPreviewCss] = useState(false)
+
+  const [oldPassword, setOldPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [pwdSaving, setPwdSaving] = useState(false)
+  const [pwdError, setPwdError] = useState('')
+  const [pwdSuccess, setPwdSuccess] = useState('')
 
   useEffect(() => {
     if (user) {
@@ -43,6 +49,7 @@ export default function Settings() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (!user) return
     setError('')
     setSuccess('')
     setSaving(true)
@@ -70,13 +77,50 @@ export default function Settings() {
     }
   }
 
+  async function handlePasswordSubmit(e: FormEvent) {
+    e.preventDefault()
+    setPwdError('')
+    setPwdSuccess('')
+
+    if (!newPassword || newPassword.length < 8) {
+      setPwdError('新密码至少需要 8 个字符')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPwdError('两次输入的密码不一致')
+      return
+    }
+
+    const hasPassword = user?.password_hash && user.password_hash.length > 0
+    if (hasPassword && !oldPassword) {
+      setPwdError('请输入当前密码')
+      return
+    }
+
+    setPwdSaving(true)
+    try {
+      await changePassword(newPassword, hasPassword ? oldPassword : undefined)
+      setPwdSuccess('密码已更新')
+      setOldPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      if (typeof refreshUser === 'function') {
+        await refreshUser()
+      }
+    } catch (err) {
+      setPwdError(err instanceof Error ? err.message : '更新失败')
+    } finally {
+      setPwdSaving(false)
+    }
+  }
+
   return (
-    <div className="form-page settings">
+    <div className="settings">
       <Link to={`/${user.username}`} className="back-link">
         ← 返回我的空间
       </Link>
-      <h1 className="form-page__title">编辑资料</h1>
-      <p className="form-page__subtitle">
+      <h1 className="settings__page-title">编辑资料</h1>
+      <p className="settings__page-subtitle">
         自定义你的个人空间。自定义 CSS 会被安全过滤，URL、JavaScript、import 等危险内容会被移除。
       </p>
 
@@ -193,8 +237,9 @@ export default function Settings() {
               style={previewCss ? { background: profileBg || 'var(--bg)' } : undefined}
             >
               <div className="css-preview__inner">
-                <h3>预览效果</h3>
-                <p>你的自定义 CSS 会应用到个人空间页面。</p>
+                <div className="preview-avatar">{displayName ? displayName.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase()}</div>
+                <h3>{displayName || user.username}</h3>
+                <p>{bio || '你的自定义 CSS 会应用到个人空间页面。这是预览效果。'}</p>
               </div>
               <style>{buildScopedCss(profileCss, '.css-preview')}</style>
             </div>
@@ -207,6 +252,67 @@ export default function Settings() {
           </button>
         </div>
       </form>
+
+      <div className="settings__section settings__section--password">
+        <h2 className="settings__section-title">
+          {user?.password_hash ? '修改密码' : '设置密码'}
+        </h2>
+        <p className="settings__section-desc">
+          {user?.password_hash
+            ? '修改你的登录密码。使用强密码保护你的账户安全。'
+            : '你当前通过 GitHub 登录。设置密码后，也可以用用户名/邮箱 + 密码登录。'}
+        </p>
+
+        {pwdError && <div className="form__error">{pwdError}</div>}
+        {pwdSuccess && <div className="form__success">{pwdSuccess}</div>}
+
+        <form onSubmit={handlePasswordSubmit} className="form">
+          {user?.password_hash && (
+            <div className="form__field">
+              <label className="form__label">当前密码</label>
+              <input
+                className="form__input"
+                type="password"
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+                placeholder="输入当前密码"
+                required
+              />
+            </div>
+          )}
+          <div className="form__row">
+            <div className="form__field">
+              <label className="form__label">新密码</label>
+              <input
+                className="form__input"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="至少 8 个字符"
+                minLength={8}
+                required
+              />
+            </div>
+            <div className="form__field">
+              <label className="form__label">确认新密码</label>
+              <input
+                className="form__input"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="再次输入新密码"
+                minLength={8}
+                required
+              />
+            </div>
+          </div>
+          <div className="form__actions">
+            <button type="submit" className="btn-primary" disabled={pwdSaving}>
+              {pwdSaving ? '保存中…' : user?.password_hash ? '更新密码' : '设置密码'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

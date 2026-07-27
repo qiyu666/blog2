@@ -1,9 +1,69 @@
+import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import SearchBar from './SearchBar';
+import NotificationsMenu from './NotificationsMenu';
+
+type Theme = 'light' | 'dark';
+
+function getInitialTheme(): Theme {
+  try {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'light' || saved === 'dark') return saved;
+  } catch {
+    // ignore
+  }
+  if (
+    typeof window !== 'undefined' &&
+    window.matchMedia &&
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+  ) {
+    return 'dark';
+  }
+  return 'light';
+}
+
+function applyTheme(theme: Theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+}
 
 export default function Header() {
   const { user, logout, unreadCount } = useAuth();
   const navigate = useNavigate();
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof document !== 'undefined') {
+      const current = document.documentElement.getAttribute('data-theme');
+      if (current === 'light' || current === 'dark') return current;
+    }
+    return 'light';
+  });
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const initial = getInitialTheme();
+    applyTheme(initial);
+    setTheme(initial);
+  }, []);
+
+  useEffect(() => {
+    function onScroll() {
+      setScrolled(window.scrollY > 12);
+    }
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  function toggleTheme() {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    setTheme(next);
+    try {
+      localStorage.setItem('theme', next);
+    } catch {
+      // ignore
+    }
+  }
 
   const handleLogout = async () => {
     await logout();
@@ -11,11 +71,12 @@ export default function Header() {
   };
 
   return (
-    <header className="site-header">
+    <header className={`site-header${scrolled ? ' scrolled' : ''}`}>
       <div className="site-header__inner">
         <Link to="/" className="brand">
           Marginalia<span className="brand__dot">.</span>
         </Link>
+        <SearchBar />
         <nav className="nav">
           <NavLink to="/" className="nav__link" end>
             论坛
@@ -23,6 +84,11 @@ export default function Header() {
           {user && (
             <NavLink to="/favorites" className="nav__link">
               收藏
+            </NavLink>
+          )}
+          {user && (
+            <NavLink to="/drafts" className="nav__link">
+              草稿
             </NavLink>
           )}
           {user?.role === 'admin' && (
@@ -38,6 +104,7 @@ export default function Header() {
                   <span className="nav__badge">{unreadCount}</span>
                 )}
               </NavLink>
+              <NotificationsMenu />
               <NavLink to="/new" className="nav__write">
                 发帖
               </NavLink>
@@ -60,6 +127,15 @@ export default function Header() {
               </Link>
             </>
           )}
+          <button
+            type="button"
+            className="nav__theme-toggle"
+            onClick={toggleTheme}
+            title={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+            aria-label="切换主题"
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
         </nav>
       </div>
     </header>

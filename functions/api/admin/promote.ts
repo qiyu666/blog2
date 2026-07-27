@@ -9,12 +9,18 @@
 
 import { json, error } from '../_helpers'
 import { cleanText } from '../_auth'
+import { enforceAdminRateLimit } from '../_rate-limit'
 
 export async function onRequestPost(context: {
   request: Request
   env: { DB: D1Database; ADMIN_SECRET?: string }
 }) {
   const { request, env } = context
+
+  // Pre-auth rate limit (strict cap — this endpoint should be hit almost never).
+  const unauthLimit = await enforceAdminRateLimit(env.DB, request, false)
+  if (unauthLimit) return unauthLimit
+
   const expectedSecret = env.ADMIN_SECRET
   if (!expectedSecret) {
     return error('管理员升级未配置（未设置 ADMIN_SECRET 环境变量）', 503)

@@ -11,9 +11,18 @@ import NewMessage from './pages/NewMessage';
 import MessageDetail from './pages/MessageDetail';
 import Favorites from './pages/Favorites';
 import Admin from './pages/Admin';
+import Analytics from './pages/Analytics';
+import Drafts from './pages/Drafts';
 import Promote from './pages/Promote';
 import UserProfile from './pages/UserProfile';
 import Settings from './pages/Settings';
+import Search from './pages/Search';
+import Notifications from './pages/Notifications';
+import Security from './pages/Security';
+import GithubCallback from './pages/GithubCallback';
+import OAuthSetup from './pages/OAuthSetup';
+import BugReport from './pages/BugReport';
+import Customize from './pages/Customize';
 import ProtectedRoute from './auth/ProtectedRoute';
 
 export default function App() {
@@ -24,6 +33,7 @@ export default function App() {
         <Route path="/post/:slug" element={<PostDetail />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/search" element={<Search />} />
         <Route
           path="/new"
           element={
@@ -72,7 +82,41 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/drafts"
+          element={
+            <ProtectedRoute>
+              <Drafts />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <Notifications />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/security"
+          element={
+            <ProtectedRoute>
+              <Security />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/promote" element={<Promote />} />
+        <Route path="/bug-report" element={<BugReport />} />
+        <Route path="/github-callback" element={<GithubCallback />} />
+        <Route
+          path="/oauth-setup"
+          element={
+            <ProtectedRoute>
+              <OAuthSetup />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/settings"
           element={
@@ -82,10 +126,26 @@ export default function App() {
           }
         />
         <Route
-          path="/admin"
+          path="/customize"
           element={
             <ProtectedRoute>
+              <Customize />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute requireRole="admin">
               <Admin />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute requireRole="admin">
+              <Analytics />
             </ProtectedRoute>
           }
         />

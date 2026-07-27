@@ -66,6 +66,7 @@ export interface SessionUser {
   avatar: string
   bio: string
   created_at: string
+  password_hash: string
 }
 
 export interface AuthContext {
@@ -85,7 +86,7 @@ export async function getSession(
   const token = tokenMatch[1]
   const row = await db
     .prepare(
-      `SELECT u.id, u.username, u.email, u.role, u.avatar, u.bio, u.created_at
+      `SELECT u.id, u.username, u.email, u.role, u.avatar, u.bio, u.created_at, u.password_hash
        FROM sessions s JOIN users u ON s.user_id = u.id
        WHERE s.token = ? AND s.expires_at > datetime('now')`
     )
@@ -117,11 +118,11 @@ export async function destroySession(db: D1Database, token: string): Promise<voi
 
 export function sessionCookie(token: string): string {
   const maxAge = SESSION_TTL_DAYS * 86400
-  return `session=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${maxAge}`
+  return `session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}`
 }
 
 export function clearSessionCookie(): string {
-  return `session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`
+  return `session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`
 }
 
 // Validation

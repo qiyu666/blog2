@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import PostForm from '../components/PostForm'
-import { updatePost } from '../api'
+import { getPost, updatePost } from '../api'
 import type { Post, PostInput } from '../types'
 
 export default function EditPost() {
@@ -12,12 +12,10 @@ export default function EditPost() {
 
   useEffect(() => {
     if (!id) return
-    // Fetch all posts and find by id (since our API gets by slug, not id)
-    fetch('/api/posts')
-      .then(res => res.json())
-      .then((posts: Post[]) => {
-        const found = posts.find(p => p.id === Number(id))
-        setPost(found || null)
+    // 通过单帖 API 加载，获取完整的 post 数据（包含 custom_js）
+    getPost(id)
+      .then((data) => {
+        setPost(data)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -44,6 +42,7 @@ export default function EditPost() {
       <Link to="/" className="back-link">← 取消</Link>
       <h1 className="form-page__title">编辑帖子</h1>
       <PostForm
+        editingId={post.id}
         initial={{
           title: post.title,
           excerpt: post.excerpt,
@@ -51,6 +50,8 @@ export default function EditPost() {
           category: post.category,
           tags: post.tags,
           cover_image: post.cover_image,
+          published: post.published,
+          custom_js: post.custom_js,
         }}
         onSubmit={handleSubmit}
         submitLabel="保存修改"

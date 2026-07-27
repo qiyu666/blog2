@@ -4,6 +4,7 @@
 
 import { json, error } from './_helpers'
 import { getSession, cleanText } from './_auth'
+import { notify } from './_notifications'
 
 export async function onRequestGet(context: {
   request: Request
@@ -80,10 +81,19 @@ export async function onRequestPost(context: {
       )
       .bind(user.id, recipient.id, subject, content)
       .run()
+    const messageId = result.meta.last_row_id as number
     const message = await env.DB
       .prepare('SELECT id, subject, content, read_at, created_at FROM messages WHERE id = ?')
-      .bind(result.meta.last_row_id)
+      .bind(messageId)
       .first()
+    // 通知收件人
+    void notify({
+      db: env.DB,
+      userId: recipient.id,
+      actorId: user.id,
+      type: 'message',
+      messageId,
+    })
     return json(message, 201)
   } catch (err) {
     return error('发送失败：' + String(err), 500)

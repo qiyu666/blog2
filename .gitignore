@@ -1,6 +1,23 @@
 node_modules
 dist
 .wrangler
+.cf-config
 .dev.vars
 *.log
 .DS_Store
+
+# Build artifacts
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js
+
+# Temp scripts
+_batch_*.json
+_split_batches.js
+_gen_batches.cjs
+_push_batch.cjs
+_push_all.js
+_push_to_github.js
+_batch.js
+_files.json
+_list_files.js

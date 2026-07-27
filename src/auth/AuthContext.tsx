@@ -13,7 +13,7 @@ interface AuthState {
   user: User | null;
   loading: boolean;
   unreadCount: number;
-  login: (identifier: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<import('../api').LoginResult>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUnread: () => Promise<void>;
@@ -62,8 +62,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, refreshUnread]);
 
   const login = useCallback(async (identifier: string, password: string) => {
-    const { user: u } = await api.login(identifier, password);
-    setUser(u);
+    const result = await api.login(identifier, password);
+    // 如果开启 2FA，返回 requires_2fa=true，由 Login 页面处理第二步
+    if (result.user) {
+      setUser(result.user);
+    }
+    return result;
   }, []);
 
   const register = useCallback(
