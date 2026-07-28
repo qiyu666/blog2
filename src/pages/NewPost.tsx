@@ -6,15 +6,25 @@ import type { PostInput } from '../types'
 export default function NewPost() {
   const navigate = useNavigate()
 
-  async function handleSubmit(data: PostInput) {
-    const post = await createPost(data)
+  async function handlePublish(data: PostInput) {
+    const post = await createPost({ ...data, published: 1 })
     navigate(`/post/${post.slug}`)
   }
 
+  async function handleSaveDraft(data: PostInput) {
+    await createPost({ ...data, published: 0 })
+    navigate('/drafts')
+  }
+
   return (
-    <div className="form-page">
-      <h1 className="form-page__title">写下值得阅读的内容。</h1>
-      <PostForm onSubmit={handleSubmit} submitLabel="发布" />
+    <div className="editor-page">
+      <div className="editor-page__inner">
+        <PostForm
+          onPublish={handlePublish}
+          onSaveDraft={handleSaveDraft}
+          mode="new"
+        />
+      </div>
     </div>
   )
 }

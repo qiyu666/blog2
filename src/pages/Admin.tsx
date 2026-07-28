@@ -174,11 +174,11 @@ export default function Admin() {
       const res = await fetch(`/api/admin/posts/${p.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_pinned: !p.is_pinned }),
+        body: JSON.stringify({ is_pinned: p.is_pinned ? 0 : 1 }),
       })
       if (!res.ok) throw new Error('操作失败')
       setPosts((prev) =>
-        prev.map((x) => (x.id === p.id ? { ...x, is_pinned: !x.is_pinned } : x)),
+        prev.map((x) => (x.id === p.id ? { ...x, is_pinned: x.is_pinned ? 0 : 1 } : x)),
       )
     } catch (err) {
       alert(err instanceof Error ? err.message : '操作失败')
@@ -190,11 +190,11 @@ export default function Admin() {
       const res = await fetch(`/api/admin/posts/${p.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_featured: !p.is_featured }),
+        body: JSON.stringify({ is_featured: p.is_featured ? 0 : 1 }),
       })
       if (!res.ok) throw new Error('操作失败')
       setPosts((prev) =>
-        prev.map((x) => (x.id === p.id ? { ...x, is_featured: !x.is_featured } : x)),
+        prev.map((x) => (x.id === p.id ? { ...x, is_featured: x.is_featured ? 0 : 1 } : x)),
       )
     } catch (err) {
       alert(err instanceof Error ? err.message : '操作失败')

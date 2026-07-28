@@ -231,6 +231,7 @@ export interface AdminPost {
   comments_count: number;
   is_pinned: number;
   is_featured: number;
+  tags?: string;
 }
 
 export interface AdminComment {

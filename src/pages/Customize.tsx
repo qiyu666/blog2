@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, DragEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { updateProfile, getUserProfile, type UserProfile } from '../api'
 import SEO from '../components/SEO'
@@ -149,6 +149,7 @@ export default function Customize() {
   }
 
   async function handleSave() {
+    if (!user) return
     setSaving(true)
     setError('')
     setSuccess('')
