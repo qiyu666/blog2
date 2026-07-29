@@ -1565,7 +1565,9 @@ input, textarea, select {
 
 .article__body h1,
 .article__body h2,
-.article__body h3 {
+.article__body h3,
+.article__body h4,
+.article__body h5 {
   font-family: var(--font-display);
   color: var(--ink);
   margin: var(--space-xl) 0 var(--space-sm);
@@ -1587,6 +1589,17 @@ input, textarea, select {
 .article__body h3 {
   font-size: 1.35rem;
   font-weight: 600;
+}
+
+.article__body h4 {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.article__body h5 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink-soft);
 }
 
 .article__body p {

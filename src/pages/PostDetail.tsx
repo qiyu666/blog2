@@ -52,7 +52,13 @@ function renderMarkdown(md: string): string {
       codeBuffer.push(line)
       continue
     }
-    if (/^###\s/.test(line)) {
+    if (/^#####\s/.test(line)) {
+      if (inList) { html += '</ul>\n'; inList = false }
+      html += `<h5>${inline(line.replace(/^#####\s/, ''))}</h5>\n`
+    } else if (/^####\s/.test(line)) {
+      if (inList) { html += '</ul>\n'; inList = false }
+      html += `<h4>${inline(line.replace(/^####\s/, ''))}</h4>\n`
+    } else if (/^###\s/.test(line)) {
       if (inList) { html += '</ul>\n'; inList = false }
       html += `<h3>${inline(line.replace(/^###\s/, ''))}</h3>\n`
     } else if (/^##\s/.test(line)) {

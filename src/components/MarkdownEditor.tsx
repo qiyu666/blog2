@@ -113,6 +113,8 @@ export default function MarkdownEditor({
             <button type="button" className="md-editor__btn" title="标题一" onClick={() => linePrefix('# ')}>H1</button>
             <button type="button" className="md-editor__btn" title="标题二" onClick={() => linePrefix('## ')}>H2</button>
             <button type="button" className="md-editor__btn" title="标题三" onClick={() => linePrefix('### ')}>H3</button>
+            <button type="button" className="md-editor__btn" title="标题四" onClick={() => linePrefix('#### ')}>H4</button>
+            <button type="button" className="md-editor__btn" title="标题五" onClick={() => linePrefix('##### ')}>H5</button>
           </div>
           <div className="md-editor__group">
             <button type="button" className="md-editor__btn" title="粗体" onClick={() => wrapSelection('**', '**', '粗体')}><strong>B</strong></button>
