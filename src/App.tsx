@@ -23,6 +23,7 @@ import GithubCallback from './pages/GithubCallback';
 import OAuthSetup from './pages/OAuthSetup';
 import BugReport from './pages/BugReport';
 import Customize from './pages/Customize';
+import NotFound from './pages/NotFound';
 import ProtectedRoute from './auth/ProtectedRoute';
 
 export default function App() {
@@ -151,6 +152,7 @@ export default function App() {
         />
         {/* User profile — must be LAST to avoid shadowing fixed routes */}
         <Route path="/:username" element={<UserProfile />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>
   );

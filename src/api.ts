@@ -506,3 +506,10 @@ export async function getBugs(): Promise<BugReportItem[]> {
   const data = await request<{ bugs: BugReportItem[] }>('/api/bugs');
   return data.bugs;
 }
+
+// ===== 用户搜索（@ 补全） =====
+export async function searchUsers(query: string): Promise<Array<{ id: number; username: string; display_name: string | null; avatar: string | null }>> {
+  const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`, { credentials: 'same-origin' })
+  if (!res.ok) return []
+  return res.json()
+}

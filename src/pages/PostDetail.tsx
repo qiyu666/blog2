@@ -1,5 +1,21 @@
 import { useEffect, useState, useCallback, FormEvent } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
+import Prism from 'prismjs'
+import 'prismjs/components/prism-javascript'
+import 'prismjs/components/prism-typescript'
+import 'prismjs/components/prism-python'
+import 'prismjs/components/prism-bash'
+import 'prismjs/components/prism-css'
+import 'prismjs/components/prism-json'
+import 'prismjs/components/prism-sql'
+import 'prismjs/components/prism-markup'
+import 'prismjs/components/prism-java'
+import 'prismjs/components/prism-c'
+import 'prismjs/components/prism-cpp'
+import 'prismjs/components/prism-go'
+import 'prismjs/components/prism-rust'
+import 'prismjs/components/prism-yaml'
+import 'prismjs/components/prism-markdown'
 import type { Post, Comment } from '../types'
 import {
   getPost,
@@ -12,6 +28,7 @@ import {
   toggleFavorite,
   toggleCommentLike,
   reportTarget,
+  searchUsers,
 } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import SEO from '../components/SEO'
@@ -24,6 +41,7 @@ function renderMarkdown(md: string): string {
   let inList = false
   let inCode = false
   let codeBuffer: string[] = []
+  let codeLang = ''
 
   function inline(text: string): string {
     return text
@@ -39,11 +57,13 @@ function renderMarkdown(md: string): string {
   for (const line of lines) {
     if (line.trim().startsWith('```')) {
       if (inCode) {
-        html += `<pre><code>${codeBuffer.join('\n').replace(/</g, '&lt;')}</code></pre>\n`
+        html += `<pre class="code-block"><code class="language-${codeLang || 'text'}">${codeBuffer.join('\n').replace(/</g, '&lt;')}</code></pre>\n`
         codeBuffer = []
         inCode = false
+        codeLang = ''
       } else {
         if (inList) { html += '</ul>\n'; inList = false }
+        codeLang = line.trim().replace(/^```/, '').trim()
         inCode = true
       }
       continue
@@ -81,7 +101,7 @@ function renderMarkdown(md: string): string {
     }
   }
   if (inList) html += '</ul>\n'
-  if (inCode) html += `<pre><code>${codeBuffer.join('\n').replace(/</g, '&lt;')}</code></pre>\n`
+  if (inCode) html += `<pre class="code-block"><code class="language-${codeLang || 'text'}">${codeBuffer.join('\n').replace(/</g, '&lt;')}</code></pre>\n`
   return html
 }
 
@@ -140,6 +160,13 @@ export default function PostDetail() {
   const [favBusy, setFavBusy] = useState(false)
   const [reportBusy, setReportBusy] = useState(false)
 
+  const [readProgress, setReadProgress] = useState(0)
+
+  const [mentionQuery, setMentionQuery] = useState('')
+  const [mentionResults, setMentionResults] = useState<Array<{ id: number; username: string; display_name: string | null; avatar: string | null }>>([])
+  const [mentionIndex, setMentionIndex] = useState(-1)
+  const [showMentions, setShowMentions] = useState(false)
+
   const loadPost = useCallback(() => {
     if (!slug) return
     setLoading(true)
@@ -172,6 +199,20 @@ export default function PostDetail() {
   }, [slug])
 
   useEffect(() => {
+    function handleScroll() {
+      const el = document.querySelector('.article')
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const total = el.scrollHeight - window.innerHeight
+      const scrolled = -rect.top
+      const pct = Math.min(Math.max(scrolled / total * 100, 0), 100)
+      setReadProgress(pct)
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  useEffect(() => {
     loadPost()
   }, [loadPost])
 
@@ -179,6 +220,22 @@ export default function PostDetail() {
     loadComments()
     loadLikeStatus()
   }, [loadComments, loadLikeStatus])
+
+  useEffect(() => {
+    if (!mentionQuery) {
+      setMentionResults([])
+      setShowMentions(false)
+      return
+    }
+    const timer = setTimeout(() => {
+      searchUsers(mentionQuery).then(results => {
+        setMentionResults(results)
+        setShowMentions(results.length > 0)
+        setMentionIndex(0)
+      })
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [mentionQuery])
 
   // 执行文章自定义脚本
   useEffect(() => {
@@ -211,6 +268,27 @@ export default function PostDetail() {
       console.warn('[custom_js] 执行出错:', err)
     }
   }, [post?.id])
+
+  // Prism 语法高亮 + 复制按钮
+  useEffect(() => {
+    if (!post) return
+    Prism.highlightAll()
+    document.querySelectorAll('.article__body pre.code-block').forEach(pre => {
+      if (pre.querySelector('.code-copy-btn')) return
+      const btn = document.createElement('button')
+      btn.className = 'code-copy-btn'
+      btn.textContent = '复制'
+      btn.onclick = async () => {
+        const code = pre.querySelector('code')
+        if (!code) return
+        await navigator.clipboard.writeText(code.textContent || '')
+        btn.textContent = '已复制'
+        setTimeout(() => { btn.textContent = '复制' }, 2000)
+      }
+      ;(pre as HTMLElement).style.position = 'relative'
+      pre.appendChild(btn)
+    })
+  }, [post])
 
   async function handleDelete() {
     if (!post) return
@@ -296,6 +374,56 @@ export default function PostDetail() {
       alert(err instanceof Error ? err.message : '举报失败')
     } finally {
       setReportBusy(false)
+    }
+  }
+
+  function handleCommentInput(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const value = e.target.value
+    setCommentText(value)
+
+    // 检测 @ 输入
+    const cursorPos = e.target.selectionStart
+    const textBeforeCursor = value.slice(0, cursorPos)
+    const atMatch = textBeforeCursor.match(/@([a-zA-Z0-9_]*)$/)
+    if (atMatch) {
+      setMentionQuery(atMatch[1])
+    } else {
+      setMentionQuery('')
+      setShowMentions(false)
+    }
+  }
+
+  function insertMention(username: string) {
+    const textarea = document.querySelector('.comment-form__textarea') as HTMLTextAreaElement
+    if (!textarea) return
+    const cursorPos = textarea.selectionStart
+    const textBefore = commentText.slice(0, cursorPos)
+    const textAfter = commentText.slice(cursorPos)
+    const atMatch = textBefore.match(/@[a-zA-Z0-9_]*$/)
+    if (atMatch) {
+      const before = textBefore.slice(0, -atMatch[0].length)
+      setCommentText(before + '@' + username + ' ' + textAfter)
+    } else {
+      setCommentText(commentText + '@' + username + ' ')
+    }
+    setShowMentions(false)
+    setMentionQuery('')
+    textarea.focus()
+  }
+
+  function handleCommentKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (!showMentions || mentionResults.length === 0) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setMentionIndex(prev => Math.min(prev + 1, mentionResults.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setMentionIndex(prev => Math.max(prev - 1, 0))
+    } else if (e.key === 'Enter' && mentionIndex >= 0) {
+      e.preventDefault()
+      insertMention(mentionResults[mentionIndex].username)
+    } else if (e.key === 'Escape') {
+      setShowMentions(false)
     }
   }
 
@@ -523,6 +651,10 @@ export default function PostDetail() {
   const authorAvatar = post.author_avatar || ''
 
   return (
+    <>
+    {post && (
+      <div className="reading-progress" style={{ width: `${readProgress}%` }} />
+    )}
     <div className="post-layout">
       <PostSidebar post={post} />
       <article className="article">
@@ -653,14 +785,42 @@ export default function PostDetail() {
           {user ? (
             <form className="comment-form" onSubmit={handleSubmitComment}>
               {commentError && <div className="form__error">{commentError}</div>}
+              <div className="comment-form__input-wrap">
               <textarea
                 className="comment-form__textarea"
                 rows={3}
-                placeholder="分享你的想法…"
+                placeholder="分享你的想法… 输入 @ 提及用户"
                 value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
+                onChange={handleCommentInput}
+                onKeyDown={handleCommentKeyDown}
                 required
               />
+              {showMentions && mentionResults.length > 0 && (
+                <div className="mention-dropdown">
+                  {mentionResults.map((u, i) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      className={`mention-dropdown__item ${i === mentionIndex ? 'mention-dropdown__item--active' : ''}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        insertMention(u.username)
+                      }}
+                    >
+                      {u.avatar ? (
+                        <img src={u.avatar} alt="" className="mention-dropdown__avatar" />
+                      ) : (
+                        <span className="mention-dropdown__avatar-fallback">{u.username.charAt(0).toUpperCase()}</span>
+                      )}
+                      <span className="mention-dropdown__name">
+                        <strong>@{u.username}</strong>
+                        {u.display_name && <span className="mention-dropdown__display">{u.display_name}</span>}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              </div>
               <div className="comment-form__actions">
                 <button
                   type="submit"
@@ -688,5 +848,6 @@ export default function PostDetail() {
         </section>
       </article>
     </div>
+    </>
   )
 }

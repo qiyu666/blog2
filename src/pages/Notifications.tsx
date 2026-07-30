@@ -32,6 +32,8 @@ function describe(n: NotificationItem): { text: string; link?: string } {
       return { text: `${actor} 关注了你`, link: n.actor_username ? `/${n.actor_username}` : undefined }
     case 'message':
       return { text: `${actor} 给你发了一封站内信`, link: '/mailbox' }
+    case 'system':
+      return { text: `${actor} 在评论中提及了你`, link: n.post_slug ? `/post/${n.post_slug}` : undefined }
     default:
       return { text: `${actor}：新动态` }
   }
