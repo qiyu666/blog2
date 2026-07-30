@@ -242,6 +242,7 @@ export async function onRequestPatch(context: {
       ['social_email', body.social_email],
     ]
     const socialProvided = socialFields.filter(([, v]) => v !== undefined)
+    let socialSkipped = false
     if (socialProvided.length > 0) {
       try {
         await env.DB.prepare('SELECT social_github FROM users WHERE id = ?').bind(user.id).first()
@@ -250,7 +251,8 @@ export async function onRequestPatch(context: {
           paramsArr.push(cleanText(val || '', 200).trim())
         }
       } catch {
-        // social_* 列不存在，跳过
+        // social_* 列不存在，标记跳过
+        socialSkipped = true
       }
     }
 
@@ -307,7 +309,13 @@ export async function onRequestPatch(context: {
       }
     }
 
-    return json({ user: updated, success: true })
+    return json({
+      user: updated,
+      success: true,
+      warning: socialSkipped
+        ? '社交资料未保存：数据库未执行 schema-v9.sql 迁移，请先运行 npx wrangler d1 execute blog-db --remote --file=./schema-v9.sql'
+        : undefined,
+    })
   } catch (err) {
     return error('更新失败：' + String(err), 500)
   }

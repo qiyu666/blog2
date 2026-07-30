@@ -105,11 +105,16 @@ export default function Settings() {
     }
 
     try {
-      await updateProfile(user.username, data)
-      setSuccess('资料已保存')
-      setJustSaved(true)
-      setTimeout(() => setJustSaved(false), 3000)
-      // 滚动到顶部，让用户看到成功提示
+      const res = await updateProfile(user.username, data)
+      if (res.warning) {
+        // 社交字段未保存（数据库未迁移）
+        setError(res.warning)
+      } else {
+        setSuccess('资料已保存')
+        setJustSaved(true)
+        setTimeout(() => setJustSaved(false), 3000)
+      }
+      // 滚动到顶部，让用户看到提示
       window.scrollTo({ top: 0, behavior: 'smooth' })
       if (typeof refreshUser === 'function') {
         await refreshUser()

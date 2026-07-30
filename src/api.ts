@@ -389,8 +389,8 @@ export async function getUserProfile(username: string): Promise<UserProfile> {
 export async function updateProfile(
   username: string,
   data: ProfileUpdate
-): Promise<{ user: User; success: boolean }> {
-  return request<{ user: User; success: boolean }>(
+): Promise<{ user: User; success: boolean; warning?: string }> {
+  return request<{ user: User; success: boolean; warning?: string }>(
     `/api/users/${encodeURIComponent(username)}`,
     {
       method: 'PATCH',
