@@ -10732,3 +10732,73 @@ a.profile-stat {
   font-weight: 500;
   background: var(--accent-faint);
 }
+
+/* ===== Toast ===== */
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 9999;
+  padding: 0.875rem 1.25rem;
+  border-radius: var(--radius-md, 8px);
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  animation: toast-slide-in 0.3s ease-out;
+  max-width: 320px;
+}
+
+.toast--success {
+  background: #10B981;
+  color: white;
+}
+
+.toast--error {
+  background: #EF4444;
+  color: white;
+}
+
+@keyframes toast-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* ===== Article Author Social ===== */
+.article-author-social {
+  display: flex;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.social-link--sm {
+  width: 28px;
+  height: 28px;
+}
+
+.social-link--sm svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ===== Own Profile Social Empty Hint ===== */
+.profile-social-empty {
+  margin-top: var(--space-sm);
+  padding: 0.625rem 0.875rem;
+  background: var(--accent-faint);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-md, 8px);
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.profile-social-empty a {
+  color: var(--accent);
+  font-weight: 500;
+}

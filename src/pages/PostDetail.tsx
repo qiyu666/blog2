@@ -29,10 +29,12 @@ import {
   toggleCommentLike,
   reportTarget,
   searchUsers,
+  getUserProfile,
 } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import SEO from '../components/SEO'
 import PostSidebar from '../components/PostSidebar'
+import SocialLinks from '../components/SocialLinks'
 
 /** Minimal markdown → HTML renderer (headings, lists, code, blockquote, bold, italic) */
 function renderMarkdown(md: string): string {
@@ -162,6 +164,16 @@ export default function PostDetail() {
 
   const [readProgress, setReadProgress] = useState(0)
 
+  const [authorProfile, setAuthorProfile] = useState<{
+    social_github?: string
+    social_twitter?: string
+    social_qq?: string
+    social_wechat?: string
+    social_telegram?: string
+    social_bilibili?: string
+    social_email?: string
+  } | null>(null)
+
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionResults, setMentionResults] = useState<Array<{ id: number; username: string; display_name: string | null; avatar: string | null }>>([])
   const [mentionIndex, setMentionIndex] = useState(-1)
@@ -215,6 +227,27 @@ export default function PostDetail() {
   useEffect(() => {
     loadPost()
   }, [loadPost])
+
+  // 加载作者社交资料
+  useEffect(() => {
+    if (!post?.author_username) {
+      setAuthorProfile(null)
+      return
+    }
+    let active = true
+    getUserProfile(post.author_username)
+      .then((p) => {
+        if (!active) return
+        setAuthorProfile(p.user)
+      })
+      .catch(() => {
+        if (!active) return
+        setAuthorProfile(null)
+      })
+    return () => {
+      active = false
+    }
+  }, [post?.author_username])
 
   useEffect(() => {
     loadComments()
@@ -695,6 +728,7 @@ export default function PostDetail() {
             <span className="article__meta-divider">·</span>
             <span>{Math.ceil(post.content.length / 500)} 分钟阅读</span>
           </div>
+          {authorProfile && <SocialLinks user={authorProfile} size="sm" />}
         </header>
 
         {post.cover_image && (

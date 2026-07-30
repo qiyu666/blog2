@@ -22,6 +22,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [justSaved, setJustSaved] = useState(false)
   const [previewCss, setPreviewCss] = useState(false)
 
   const [oldPassword, setOldPassword] = useState('')
@@ -83,6 +84,7 @@ export default function Settings() {
     if (!user) return
     setError('')
     setSuccess('')
+    setJustSaved(false)
     setSaving(true)
 
     const data: ProfileUpdate = {
@@ -105,6 +107,10 @@ export default function Settings() {
     try {
       await updateProfile(user.username, data)
       setSuccess('资料已保存')
+      setJustSaved(true)
+      setTimeout(() => setJustSaved(false), 3000)
+      // 滚动到顶部，让用户看到成功提示
+      window.scrollTo({ top: 0, behavior: 'smooth' })
       if (typeof refreshUser === 'function') {
         await refreshUser()
       }
@@ -384,7 +390,7 @@ export default function Settings() {
 
         <div className="form__actions">
           <button type="submit" className="btn-primary" disabled={saving}>
-            {saving ? '保存中…' : '保存修改'}
+            {saving ? '保存中…' : justSaved ? '✓ 已保存' : '保存修改'}
           </button>
         </div>
       </form>
@@ -449,6 +455,13 @@ export default function Settings() {
           </div>
         </form>
       </div>
+
+      {success && (
+        <div className="toast toast--success">{success}</div>
+      )}
+      {error && (
+        <div className="toast toast--error">{error}</div>
+      )}
     </div>
   )
 }
