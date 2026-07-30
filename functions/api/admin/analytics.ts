@@ -30,6 +30,9 @@ export async function onRequestGet(context: {
       topPosts,
       topUsers,
       overview,
+      trends7dRaw,
+      userGrowth30dRaw,
+      usersBefore30d,
     ] = await Promise.all([
       env.DB
         .prepare(
@@ -121,7 +124,86 @@ export async function onRequestGet(context: {
           pendingReports: pendingReports?.c || 0,
         })
       ),
+      // 7 天趋势：每日文章数、新用户数、评论数
+      Promise.all([
+        env.DB
+          .prepare(
+            `SELECT date(created_at) AS date, COUNT(*) AS count
+             FROM posts
+             WHERE created_at >= date('now', '-7 days')
+             GROUP BY date(created_at)
+             ORDER BY date ASC`
+          )
+          .all(),
+        env.DB
+          .prepare(
+            `SELECT date(created_at) AS date, COUNT(*) AS count
+             FROM users
+             WHERE created_at >= date('now', '-7 days')
+             GROUP BY date(created_at)
+             ORDER BY date ASC`
+          )
+          .all(),
+        env.DB
+          .prepare(
+            `SELECT date(created_at) AS date, COUNT(*) AS count
+             FROM comments
+             WHERE created_at >= date('now', '-7 days')
+             GROUP BY date(created_at)
+             ORDER BY date ASC`
+          )
+          .all(),
+      ]),
+      // 近 30 天用户增长（每日新增）
+      env.DB
+        .prepare(
+          `SELECT date(created_at) AS date, COUNT(*) AS daily_count
+           FROM users
+           WHERE created_at >= date('now', '-30 days')
+           GROUP BY date(created_at)
+           ORDER BY date ASC`
+        )
+        .all(),
+      // 30 天前已有用户总数（作为累计基数）
+      env.DB
+        .prepare(`SELECT COUNT(*) AS c FROM users WHERE created_at < date('now', '-30 days')`)
+        .first<{ c: number }>(),
     ])
+
+    // ===== 后处理：构建 7 天趋势（补齐空日期） =====
+    const trends7dMap = new Map<string, { posts: number; users: number; comments: number }>()
+    const now = new Date()
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now)
+      d.setUTCDate(d.getUTCDate() - i)
+      trends7dMap.set(d.toISOString().slice(0, 10), { posts: 0, users: 0, comments: 0 })
+    }
+    for (const r of (trends7dRaw[0].results as any[])) {
+      if (trends7dMap.has(r.date)) trends7dMap.get(r.date)!.posts = r.count
+    }
+    for (const r of (trends7dRaw[1].results as any[])) {
+      if (trends7dMap.has(r.date)) trends7dMap.get(r.date)!.users = r.count
+    }
+    for (const r of (trends7dRaw[2].results as any[])) {
+      if (trends7dMap.has(r.date)) trends7dMap.get(r.date)!.comments = r.count
+    }
+    const trends7d = Array.from(trends7dMap.entries()).map(([date, v]) => ({ date, ...v }))
+
+    // ===== 后处理：构建近 30 天累计用户增长 =====
+    const userGrowth30dMap = new Map<string, number>()
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now)
+      d.setUTCDate(d.getUTCDate() - i)
+      userGrowth30dMap.set(d.toISOString().slice(0, 10), 0)
+    }
+    for (const r of (userGrowth30dRaw.results as any[])) {
+      if (userGrowth30dMap.has(r.date)) userGrowth30dMap.set(r.date, r.daily_count)
+    }
+    let cumulative = usersBefore30d?.c || 0
+    const userGrowth30d = Array.from(userGrowth30dMap.entries()).map(([date, daily_count]) => {
+      cumulative += daily_count
+      return { date, daily_count, cumulative }
+    })
 
     return json({
       userGrowth: userGrowth.results,
@@ -131,6 +213,8 @@ export async function onRequestGet(context: {
       topPosts: topPosts.results,
       topUsers: topUsers.results,
       overview,
+      trends7d,
+      userGrowth30d,
     })
   } catch (err) {
     return error('Failed to fetch analytics: ' + String(err), 500)

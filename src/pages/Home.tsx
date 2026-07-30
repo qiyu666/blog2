@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import type { Post } from '../types'
 import { getPosts } from '../api'
 import PostCard from '../components/PostCard'
@@ -7,12 +8,6 @@ import SEO from '../components/SEO'
 import { useAuth } from '../auth/AuthContext'
 
 type SortKey = 'latest' | 'trending' | 'featured'
-
-const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: 'latest', label: '最新' },
-  { key: 'trending', label: '热门' },
-  { key: 'featured', label: '精华' },
-]
 
 function formatNumber(n: number): string {
   if (n >= 10000) return (n / 1000).toFixed(1) + 'k'
@@ -29,6 +24,7 @@ function formatDate(dateStr: string): string {
 
 export default function Home() {
   const { user } = useAuth()
+  const { t } = useTranslation()
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -107,25 +103,25 @@ export default function Home() {
     return { totalViews, totalLikes, totalComments }
   }, [posts])
 
-  if (loading) return <div className="loading">正在加载…</div>
+  if (loading) return <div className="loading">{t('home.loading')}</div>
   if (error) return (
     <div className="error-state">
-      <h2 className="error-state__title">无法加载帖子</h2>
+      <h2 className="error-state__title">{t('home.loadFailed')}</h2>
       <p className="error-state__msg">{error}</p>
     </div>
   )
   if (posts.length === 0) return (
     <div className="error-state">
-      <h2 className="error-state__title">还没有帖子</h2>
+      <h2 className="error-state__title">{t('home.noPostsYet')}</h2>
       <p className="error-state__msg">
-        <Link to="/new" style={{ color: 'var(--accent)' }}>写第一篇吧</Link>
+        <Link to="/new" style={{ color: 'var(--accent)' }}>{t('home.writeFirst')}</Link>
       </p>
     </div>
   )
 
   return (
     <>
-      <SEO title="Marginalia - 慢思随笔" description="Marginalia — 一个慢节奏的随笔社区。记录阅读、写作、注意力与设计相关的随想与田野笔记。" />
+      <SEO title={t('home.seoTitle')} description={t('home.seoDesc')} />
 
       {/* Hero 区域 */}
       <section className="home-hero">
@@ -139,46 +135,45 @@ export default function Home() {
           <div className="home-hero__content">
             <div className="home-hero__badge">
               <span className="home-hero__badge-dot"></span>
-              慢思随笔 · 第 {posts.length} 期
+              {t('home.heroBadge', { count: posts.length })}
             </div>
             <h1 className="home-hero__title">
-              让想法
-              <span className="home-hero__title-gradient">慢慢相遇</span>
+              {t('home.heroTitle')}
+              <span className="home-hero__title-gradient">{t('home.heroTitleGradient')}</span>
             </h1>
             <p className="home-hero__subtitle">
-              记录阅读、写作、注意力与设计的田野笔记。
-              不定期发布，细细品读——在这个快节奏的时代里，
-              <em>保留一方慢思考的角落。</em>
+              {t('home.heroSubtitle')}
+              <em>{t('home.heroSubtitleEm')}</em>
             </p>
             <div className="home-hero__actions">
               <Link to="/new" className="home-hero__btn home-hero__btn--primary">
                 <span>✍️</span>
-                开始写作
+                {t('home.startWriting')}
               </Link>
               <a href="#posts" className="home-hero__btn home-hero__btn--ghost">
-                浏览文章
+                {t('home.browsePosts')}
                 <span>↓</span>
               </a>
             </div>
             <div className="home-hero__stats">
               <div className="home-hero__stat">
                 <span className="home-hero__stat-num">{posts.length}</span>
-                <span className="home-hero__stat-label">篇文章</span>
+                <span className="home-hero__stat-label">{t('home.statPosts')}</span>
               </div>
               <div className="home-hero__divider"></div>
               <div className="home-hero__stat">
                 <span className="home-hero__stat-num">{formatNumber(stats.totalViews)}</span>
-                <span className="home-hero__stat-label">次阅读</span>
+                <span className="home-hero__stat-label">{t('home.statViews')}</span>
               </div>
               <div className="home-hero__divider"></div>
               <div className="home-hero__stat">
                 <span className="home-hero__stat-num">{categories.length}</span>
-                <span className="home-hero__stat-label">个专题</span>
+                <span className="home-hero__stat-label">{t('home.statCategories')}</span>
               </div>
               <div className="home-hero__divider"></div>
               <div className="home-hero__stat">
                 <span className="home-hero__stat-num">{tags.length}</span>
-                <span className="home-hero__stat-label">个标签</span>
+                <span className="home-hero__stat-label">{t('home.statTags')}</span>
               </div>
             </div>
           </div>
@@ -190,7 +185,7 @@ export default function Home() {
                   <div className="hero-feature-card__overlay"></div>
                   <span className="hero-feature-card__badge">
                     <span className="hero-feature-card__badge-icon">📌</span>
-                    置顶
+                    {t('home.pinned')}
                   </span>
                 </div>
                 <div className="hero-feature-card__body">
@@ -220,7 +215,7 @@ export default function Home() {
                 onClick={() => setActiveCategory('all')}
               >
                 <span className="category-nav__icon">📚</span>
-                <span className="category-nav__name">全部</span>
+                <span className="category-nav__name">{t('home.all')}</span>
                 <span className="category-nav__count">{posts.length}</span>
               </button>
               {categories.slice(0, 8).map((cat) => (
@@ -245,10 +240,10 @@ export default function Home() {
           <div className="container">
             <div className="section-head">
               <div>
-                <span className="section-head__label">精选推荐</span>
-                <h2 className="section-head__title">编辑精选</h2>
+                <span className="section-head__label">{t('home.featuredLabel')}</span>
+                <h2 className="section-head__title">{t('home.featuredTitle')}</h2>
               </div>
-              <Link to="/" className="section-head__more">查看全部 →</Link>
+              <Link to="/" className="section-head__more">{t('home.viewAll')} →</Link>
             </div>
             <div className="featured-grid">
               {featuredPosts.map((post, i) => (
@@ -258,7 +253,7 @@ export default function Home() {
                     <div className="featured-grid__gradient"></div>
                     <div className="featured-grid__badges">
                       <span className="featured-grid__badge">
-                        <span>⭐</span> 精选
+                        <span>⭐</span> {t('home.featuredBadge')}
                       </span>
                       <span className="featured-grid__category">{post.category}</span>
                     </div>
@@ -289,14 +284,18 @@ export default function Home() {
             <div className="section-head">
               <div>
                 <span className="section-head__label">
-                  {activeCategory === 'all' ? '全部文章' : activeCategory}
+                  {activeCategory === 'all' ? t('home.allPosts') : activeCategory}
                 </span>
                 <h2 className="section-head__title">
-                  {activeCategory === 'all' ? '最新发布' : `${activeCategory} 专题`}
+                  {activeCategory === 'all' ? t('home.latestTitle') : t('home.categoryTitle', { name: activeCategory })}
                 </h2>
               </div>
-              <div className="sort-tabs" role="tablist" aria-label="排序方式">
-                {SORT_OPTIONS.map((opt) => (
+              <div className="sort-tabs" role="tablist" aria-label={t('common.search')}>
+                {([
+                  { key: 'latest', label: t('home.sortLatest') },
+                  { key: 'trending', label: t('home.sortTrending') },
+                  { key: 'featured', label: t('home.sortFeatured') },
+                ] as { key: SortKey; label: string }[]).map((opt) => (
                   <button
                     key={opt.key}
                     type="button"
@@ -314,7 +313,7 @@ export default function Home() {
             {normalPosts.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state__icon">📝</div>
-                <p className="empty-state__msg">该分类下暂无文章</p>
+                <p className="empty-state__msg">{t('home.noPostsInCategory')}</p>
               </div>
             ) : (
               <div className="post-list">
@@ -339,24 +338,23 @@ export default function Home() {
                   )}
                 </div>
                 <div className="sidebar-profile__info">
-                  <h3 className="sidebar-profile__name">关于本站</h3>
+                  <h3 className="sidebar-profile__name">{t('home.aboutSite')}</h3>
                   <p className="sidebar-profile__bio">
-                    慢思随笔 — 一个关于阅读、写作、注意力与设计的个人博客。
-                    在快节奏的时代里，保留一方慢思考的角落。
+                    {t('home.aboutBio')}
                   </p>
                 </div>
                 <div className="sidebar-profile__stats">
                   <div className="sidebar-profile__stat">
                     <span className="sidebar-profile__stat-num">{posts.length}</span>
-                    <span className="sidebar-profile__stat-label">文章</span>
+                    <span className="sidebar-profile__stat-label">{t('home.statArticles')}</span>
                   </div>
                   <div className="sidebar-profile__stat">
                     <span className="sidebar-profile__stat-num">{formatNumber(stats.totalViews)}</span>
-                    <span className="sidebar-profile__stat-label">阅读</span>
+                    <span className="sidebar-profile__stat-label">{t('home.statReads')}</span>
                   </div>
                   <div className="sidebar-profile__stat">
                     <span className="sidebar-profile__stat-num">{categories.length}</span>
-                    <span className="sidebar-profile__stat-label">专题</span>
+                    <span className="sidebar-profile__stat-label">{t('home.statTopics')}</span>
                   </div>
                 </div>
               </div>
@@ -366,7 +364,7 @@ export default function Home() {
             {hotPosts.length > 0 && (
               <div className="sidebar-card">
                 <div className="sidebar-card__header">
-                  <h3 className="sidebar-card__title">🔥 热门文章</h3>
+                  <h3 className="sidebar-card__title">{t('home.hotPosts')}</h3>
                 </div>
                 <div className="sidebar-card__body">
                   <div className="hot-posts">
@@ -392,7 +390,7 @@ export default function Home() {
             {tags.length > 0 && (
               <div className="sidebar-card">
                 <div className="sidebar-card__header">
-                  <h3 className="sidebar-card__title">🏷️ 热门标签</h3>
+                  <h3 className="sidebar-card__title">{t('home.hotTags')}</h3>
                 </div>
                 <div className="sidebar-card__body">
                   <div className="sidebar-tags">
@@ -411,7 +409,7 @@ export default function Home() {
             {categories.length > 0 && (
               <div className="sidebar-card">
                 <div className="sidebar-card__header">
-                  <h3 className="sidebar-card__title">📂 全部分类</h3>
+                  <h3 className="sidebar-card__title">{t('home.allCategories')}</h3>
                 </div>
                 <div className="sidebar-card__body">
                   <div className="sidebar-categories">

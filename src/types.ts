@@ -46,6 +46,13 @@ export interface User {
   profile_css?: string;
   profile_bg?: string;
   profile_layout?: string;
+  social_github?: string;
+  social_twitter?: string;
+  social_qq?: string;
+  social_wechat?: string;
+  social_telegram?: string;
+  social_bilibili?: string;
+  social_email?: string;
   password_hash?: string;
   created_at: string;
 }
@@ -121,4 +128,29 @@ export interface NotificationItem {
   actor_avatar: string | null;
   post_title: string | null;
   post_slug: string | null;
+}
+
+export interface UserStats {
+  total_likes: number;
+  total_favorites: number;
+  total_comments: number;
+  posts_count: number;
+}
+
+export interface UserPost {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string;
+  category: string;
+  cover_image: string;
+  views: number;
+  likes_count: number;
+  comments_count: number;
+  created_at: string;
+}
+
+export interface UserCategory {
+  category: string;
+  count: number;
 }

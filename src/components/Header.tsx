@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext';
 import SearchBar from './SearchBar';
 import NotificationsMenu from './NotificationsMenu';
+import LanguageSwitcher from './LanguageSwitcher';
 
 type Theme = 'light' | 'dark';
 
@@ -29,6 +31,7 @@ function applyTheme(theme: Theme) {
 
 export default function Header() {
   const { user, logout, unreadCount } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof document !== 'undefined') {
@@ -79,60 +82,61 @@ export default function Header() {
         <SearchBar />
         <nav className="nav">
           <NavLink to="/" className="nav__link" end>
-            论坛
+            {t('nav.forum')}
           </NavLink>
           {user && (
             <NavLink to="/favorites" className="nav__link">
-              收藏
+              {t('nav.favorites')}
             </NavLink>
           )}
           {user && (
             <NavLink to="/drafts" className="nav__link">
-              草稿
+              {t('nav.drafts')}
             </NavLink>
           )}
           {user?.role === 'admin' && (
             <NavLink to="/admin" className="nav__link nav__link--admin">
-              后台
+              {t('nav.admin')}
             </NavLink>
           )}
           {user ? (
             <>
               <NavLink to="/mailbox" className="nav__link nav__mail">
-                站内信
+                {t('nav.mailbox')}
                 {unreadCount > 0 && (
                   <span className="nav__badge">{unreadCount}</span>
                 )}
               </NavLink>
               <NotificationsMenu />
               <NavLink to="/new" className="nav__write">
-                发帖
+                {t('nav.newPost')}
               </NavLink>
               <div className="nav__user">
                 <Link to={`/${user.username}`} className="nav__username">
                   {user.display_name || user.username}
                 </Link>
                 <button onClick={handleLogout} className="nav__logout">
-                  退出
+                  {t('nav.logout')}
                 </button>
               </div>
             </>
           ) : (
             <>
               <Link to="/login" className="nav__link">
-                登录
+                {t('nav.login')}
               </Link>
               <Link to="/register" className="nav__write">
-                注册
+                {t('nav.register')}
               </Link>
             </>
           )}
+          <LanguageSwitcher />
           <button
             type="button"
             className="nav__theme-toggle"
             onClick={toggleTheme}
-            title={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
-            aria-label="切换主题"
+            title={theme === 'dark' ? t('common.toggleLight') : t('common.toggleDark')}
+            aria-label={t('common.toggleTheme')}
           >
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>

@@ -10,6 +10,7 @@ import {
   deletePost,
   deleteComment,
   getBugs,
+  batchPostAction,
   type AdminUser,
   type AdminPost,
   type AdminComment,
@@ -41,6 +42,8 @@ type Tab =
   | 'reports'
   | 'bugs'
   | 'settings'
+
+type BatchPostAction = 'delete' | 'publish' | 'unpublish' | 'pin' | 'unpin'
 
 function formatTime(dateStr: string): string {
   return new Date(dateStr + 'Z').toLocaleString('zh-CN', {
@@ -198,6 +201,34 @@ export default function Admin() {
       )
     } catch (err) {
       alert(err instanceof Error ? err.message : '操作失败')
+    }
+  }
+
+  async function handleBatchPostAction(action: BatchPostAction, ids: number[]) {
+    try {
+      await batchPostAction(action, ids)
+      if (action === 'delete') {
+        setPosts((prev) => prev.filter((p) => !ids.includes(p.id)))
+      } else if (action === 'publish') {
+        setPosts((prev) =>
+          prev.map((p) =>
+            ids.includes(p.id) ? { ...p, published: 1, status: 'published' as const } : p,
+          ),
+        )
+      } else if (action === 'unpublish') {
+        setPosts((prev) =>
+          prev.map((p) =>
+            ids.includes(p.id) ? { ...p, published: 0, status: 'draft' as const } : p,
+          ),
+        )
+      } else if (action === 'pin') {
+        setPosts((prev) => prev.map((p) => (ids.includes(p.id) ? { ...p, is_pinned: 1 } : p)))
+      } else if (action === 'unpin') {
+        setPosts((prev) => prev.map((p) => (ids.includes(p.id) ? { ...p, is_pinned: 0 } : p)))
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '批量操作失败')
+      throw err
     }
   }
 
@@ -570,6 +601,7 @@ export default function Admin() {
               onDelete={handleDeletePost}
               onTogglePinned={handleTogglePinned}
               onToggleFeatured={handleToggleFeatured}
+              onBatchAction={handleBatchPostAction}
             />
           )}
 
@@ -981,6 +1013,7 @@ function PostsView({
   onDelete,
   onTogglePinned,
   onToggleFeatured,
+  onBatchAction,
 }: {
   posts: AdminPost[]
   totalPosts: number
@@ -994,7 +1027,53 @@ function PostsView({
   onDelete: (id: number, title: string) => void
   onTogglePinned: (p: AdminPost) => void
   onToggleFeatured: (p: AdminPost) => void
+  onBatchAction: (action: BatchPostAction, ids: number[]) => Promise<void>
 }) {
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+
+  // 列表变化时清空选择（筛选/刷新后）
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [posts])
+
+  const allSelected = posts.length > 0 && posts.every((p) => selectedIds.has(p.id))
+
+  function toggleOne(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(posts.map((p) => p.id)))
+    }
+  }
+
+  async function runBatch(action: BatchPostAction) {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    const labels: Record<BatchPostAction, string> = {
+      delete: '删除',
+      publish: '发布',
+      unpublish: '取消发布',
+      pin: '置顶',
+      unpin: '取消置顶',
+    }
+    if (!confirm(`确认批量${labels[action]} ${ids.length} 篇文章？`)) return
+    try {
+      await onBatchAction(action, ids)
+      setSelectedIds(new Set())
+    } catch {
+      // 错误已在父级提示
+    }
+  }
+
   return (
     <div className="admin-list-view">
       {/* 状态筛选 */}
@@ -1038,7 +1117,13 @@ function PostsView({
             <thead>
               <tr>
                 <th style={{ width: 40 }}>
-                  <input type="checkbox" className="admin-checkbox" />
+                  <input
+                    type="checkbox"
+                    className="admin-row__checkbox"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    aria-label="全选"
+                  />
                 </th>
                 <th>标题</th>
                 <th>作者</th>
@@ -1054,7 +1139,13 @@ function PostsView({
               {posts.map((p) => (
                 <tr key={p.id}>
                   <td>
-                    <input type="checkbox" className="admin-checkbox" />
+                    <input
+                      type="checkbox"
+                      className="admin-row__checkbox"
+                      checked={selectedIds.has(p.id)}
+                      onChange={() => toggleOne(p.id)}
+                      aria-label={`选择 ${p.title}`}
+                    />
                   </td>
                   <td className="admin-table__title">
                     <div className="admin-post-title">
@@ -1119,6 +1210,48 @@ function PostsView({
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* 批量操作栏 */}
+      {selectedIds.size > 0 && (
+        <div className="admin-batch-bar">
+          <span className="admin-batch-bar__count">已选 {selectedIds.size} 篇</span>
+          <button
+            type="button"
+            className="admin-batch-bar__btn"
+            onClick={() => runBatch('publish')}
+          >
+            批量发布
+          </button>
+          <button
+            type="button"
+            className="admin-batch-bar__btn"
+            onClick={() => runBatch('unpublish')}
+          >
+            取消发布
+          </button>
+          <button
+            type="button"
+            className="admin-batch-bar__btn"
+            onClick={() => runBatch('pin')}
+          >
+            批量置顶
+          </button>
+          <button
+            type="button"
+            className="admin-batch-bar__btn"
+            onClick={() => runBatch('unpin')}
+          >
+            取消置顶
+          </button>
+          <button
+            type="button"
+            className="admin-batch-bar__btn admin-batch-bar__btn--danger"
+            onClick={() => runBatch('delete')}
+          >
+            批量删除
+          </button>
         </div>
       )}
     </div>

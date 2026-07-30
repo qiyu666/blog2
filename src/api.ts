@@ -8,6 +8,7 @@ import type {
   SearchResult,
   FollowStatus,
   NotificationItem,
+  UserCategory,
 } from './types';
 
 export interface LoginResult {
@@ -338,6 +339,8 @@ export interface AnalyticsData {
     views: number;
     pendingReports: number;
   };
+  trends7d?: Array<{ date: string; posts: number; users: number; comments: number }>;
+  userGrowth30d?: Array<{ date: string; daily_count: number; cumulative: number }>;
 }
 
 export async function getAnalytics(): Promise<AnalyticsData> {
@@ -353,9 +356,11 @@ export interface UserProfile {
     comments_count: number;
     total_likes_received: number;
     total_favorites_received: number;
+    total_comments_received?: number;
     following_count?: number;
     followers_count?: number;
   };
+  categories?: UserCategory[];
   is_following?: boolean;
 }
 
@@ -368,6 +373,13 @@ export interface ProfileUpdate {
   profile_bg?: string;
   profile_css?: string;
   profile_layout?: string;
+  social_github?: string;
+  social_twitter?: string;
+  social_qq?: string;
+  social_wechat?: string;
+  social_telegram?: string;
+  social_bilibili?: string;
+  social_email?: string;
 }
 
 export async function getUserProfile(username: string): Promise<UserProfile> {
@@ -512,4 +524,15 @@ export async function searchUsers(query: string): Promise<Array<{ id: number; us
   const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`, { credentials: 'same-origin' })
   if (!res.ok) return []
   return res.json()
+}
+
+// ===== 批量操作（文章） =====
+export async function batchPostAction(
+  action: 'delete' | 'publish' | 'unpublish' | 'pin' | 'unpin',
+  ids: number[]
+): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>('/api/admin/posts', {
+    method: 'POST',
+    body: JSON.stringify({ action, ids }),
+  });
 }

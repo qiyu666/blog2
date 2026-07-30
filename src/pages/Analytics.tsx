@@ -231,6 +231,49 @@ export default function Analytics() {
           </div>
         )}
       </section>
+
+      {/* 7 天趋势图（折线） */}
+      {data.trends7d && data.trends7d.length > 0 && (
+        <TrendsLineChart data={data.trends7d} />
+      )}
+
+      {/* 热门文章 Top 10（带排名徽标） */}
+      {data.topPosts.length > 0 && (
+        <section className="analytics-top-posts">
+          <h2 className="analytics-section__title">热门文章 Top 10</h2>
+          <table className="analytics-top-posts__table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>标题</th>
+                <th>浏览</th>
+                <th>点赞</th>
+                <th>评论</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.topPosts.map((p, i) => (
+                <tr key={p.id}>
+                  <td>
+                    <span className="analytics-top-posts__rank">{i + 1}</span>
+                  </td>
+                  <td>
+                    <Link to={`/post/${p.slug}`}>{p.title}</Link>
+                  </td>
+                  <td>{formatNumber(p.views)}</td>
+                  <td>{p.likes_count}</td>
+                  <td>{p.comments_count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {/* 30 天用户增长（累计柱状图） */}
+      {data.userGrowth30d && data.userGrowth30d.length > 0 && (
+        <UserGrowthCumulative data={data.userGrowth30d} />
+      )}
     </div>
   )
 }
@@ -271,5 +314,109 @@ function GrowthChart({
         <span>{formatDay(data[data.length - 1]?.day || '')}</span>
       </div>
     </div>
+  )
+}
+
+/** 7 天趋势折线图（纯 SVG，三条线：文章/用户/评论） */
+function TrendsLineChart({
+  data,
+}: {
+  data: Array<{ date: string; posts: number; users: number; comments: number }>
+}) {
+  const width = 640
+  const height = 200
+  const padding = { top: 16, right: 16, bottom: 28, left: 36 }
+  const innerW = width - padding.left - padding.right
+  const innerH = height - padding.top - padding.bottom
+
+  const maxVal = Math.max(
+    1,
+    ...data.flatMap((d) => [d.posts, d.users, d.comments]),
+  )
+  const stepX = data.length > 1 ? innerW / (data.length - 1) : innerW
+
+  const buildPoints = (key: 'posts' | 'users' | 'comments') =>
+    data
+      .map((d, i) => {
+        const x = padding.left + i * stepX
+        const y = padding.top + innerH - (d[key] / maxVal) * innerH
+        return `${x},${y}`
+      })
+      .join(' ')
+
+  const lines = [
+    { key: 'posts' as const, color: 'var(--accent)', label: '文章' },
+    { key: 'users' as const, color: 'var(--sage)', label: '用户' },
+    { key: 'comments' as const, color: 'var(--gold)', label: '评论' },
+  ]
+
+  return (
+    <section className="analytics-trends">
+      <h2 className="analytics-section__title">7 天趋势</h2>
+      <div className="analytics-trends__chart">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
+          style={{ width: '100%', height: '100%' }}
+        >
+          {[0, 0.25, 0.5, 0.75, 1].map((p) => (
+            <line
+              key={p}
+              x1={padding.left}
+              x2={width - padding.right}
+              y1={padding.top + innerH * p}
+              y2={padding.top + innerH * p}
+              stroke="var(--line-soft)"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {lines.map((l) => (
+            <polyline
+              key={l.key}
+              className="analytics-trends__line"
+              points={buildPoints(l.key)}
+              style={{ stroke: l.color }}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        </svg>
+      </div>
+      <div className="analytics-trends__legend">
+        {lines.map((l) => (
+          <div key={l.key} className="analytics-trends__legend-item">
+            <span
+              className="analytics-trends__legend-dot"
+              style={{ background: l.color }}
+            />
+            {l.label}
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/** 30 天用户累计增长柱状图（纯 CSS div 高度按比例） */
+function UserGrowthCumulative({
+  data,
+}: {
+  data: Array<{ date: string; daily_count: number; cumulative: number }>
+}) {
+  const maxCum = Math.max(1, ...data.map((d) => d.cumulative))
+  return (
+    <section className="analytics-user-growth">
+      <h2 className="analytics-section__title">30 天用户增长（累计）</h2>
+      <div className="analytics-user-growth__bars">
+        {data.map((d) => (
+          <div
+            key={d.date}
+            className="analytics-user-growth__bar"
+            style={{ height: `${(d.cumulative / maxCum) * 100}%` }}
+            data-value={`${formatDay(d.date)}：累计 ${d.cumulative}`}
+          />
+        ))}
+      </div>
+    </section>
   )
 }

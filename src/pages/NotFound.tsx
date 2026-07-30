@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 
 export default function NotFound() {
+  const { t } = useTranslation()
   const [count, setCount] = useState(15)
 
   useEffect(() => {
@@ -23,20 +25,20 @@ export default function NotFound() {
       <div className="not-found__bg" />
       <div className="not-found__content">
         <div className="not-found__code">404</div>
-        <h1 className="not-found__title">页面走丢了</h1>
+        <h1 className="not-found__title">{t('notFound.title')}</h1>
         <p className="not-found__desc">
-          你访问的页面不存在，可能已被移动或删除。
+          {t('notFound.desc')}
         </p>
         <div className="not-found__actions">
           <Link to="/" className="not-found__btn not-found__btn--primary">
-            返回首页
+            {t('notFound.backHome')}
           </Link>
           <Link to="/search" className="not-found__btn not-found__btn--ghost">
-            搜索内容
+            {t('notFound.searchContent')}
           </Link>
         </div>
         <p className="not-found__countdown">
-          {count} 秒后自动返回首页
+          {t('notFound.countdown', { count })}
         </p>
         <div className="not-found__illustration">
           <svg viewBox="0 0 200 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="not-found__svg">
