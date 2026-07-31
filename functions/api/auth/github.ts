@@ -29,10 +29,23 @@ export async function onRequestGet(context: {
   const redirectUri = `${url.origin}/api/auth/github/callback`
   const authUrl = buildAuthUrl(env.GITHUB_CLIENT_ID, state, redirectUri)
 
+  // 设置 CSRF 防护 state cookie，callback 中与 URL state 参数比对
+  const cookies = [
+    `oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`,
+  ]
+  // 支持绑定流程：带 bind=1 时额外设置绑定标记 cookie
+  if (url.searchParams.get('bind') === '1') {
+    cookies.push(`oauth_bind=1; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`)
+  }
+
+  const headers = new Headers()
+  headers.set('Location', authUrl)
+  for (const c of cookies) {
+    headers.append('Set-Cookie', c)
+  }
+
   return new Response(null, {
     status: 302,
-    headers: {
-      'Location': authUrl,
-    },
+    headers,
   })
 }

@@ -203,6 +203,47 @@ export async function pruneAdminApiHits(db: D1Database): Promise<void> {
     .run()
 }
 
+// ---------------- 通用写入限流 ----------------
+
+// 写入操作（评论/点赞/收藏/举报）合并限流：每 IP 每分钟最多 30 次
+const WRITE_WINDOW_MIN = 1
+const WRITE_MAX_HITS = 30
+
+/**
+ * 通用写入限流：对评论/点赞/收藏/举报等写入操作按 IP 合并计数。
+ * 复用 admin_api_hits 表，无需新建表。
+ * 超限返回 429，否则返回 null。
+ */
+export async function enforceWriteRateLimit(
+  db: D1Database,
+  request: Request
+): Promise<Response | null> {
+  const ip = getCfIp(request)
+  const path = new URL(request.url).pathname
+
+  // 记录本次写入请求
+  await db
+    .prepare('INSERT INTO admin_api_hits (ip, path) VALUES (?, ?)')
+    .bind(ip, path)
+    .run()
+
+  // 统计该 IP 在窗口内的写入次数
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS c
+       FROM admin_api_hits
+       WHERE ip = ? AND created_at > datetime('now', ?)`
+    )
+    .bind(ip, `-${WRITE_WINDOW_MIN} minutes`)
+    .first<{ c: number }>()
+
+  const hits = row?.c || 0
+  if (hits > WRITE_MAX_HITS) {
+    return error('操作过于频繁，请稍后再试', 429, { 'Retry-After': '60' })
+  }
+  return null
+}
+
 // Exported for tests / status reporting
 export const __tunables = {
   LOGIN_WINDOW_MIN,
