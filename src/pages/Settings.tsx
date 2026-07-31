@@ -273,6 +273,30 @@ export default function Settings() {
         自定义你的个人空间。自定义 CSS 会被安全过滤，URL、JavaScript、import 等危险内容会被移除。
       </p>
 
+      {/* 头像本地上传区域样式（内联，避免依赖 index.css 的大文件推送） */}
+      <style>{`
+        .avatar-upload {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          margin-top: 0.5rem;
+          flex-wrap: wrap;
+        }
+        .avatar-upload__preview {
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          object-fit: cover;
+          border: 2px solid var(--line);
+          background: var(--bg-soft, #f5f5f5);
+        }
+        .avatar-upload .btn-secondary:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none;
+        }
+      `}</style>
+
       {error && <div className="form__error">{error}</div>}
       {success && <div className="form__success">{success}</div>}
 
