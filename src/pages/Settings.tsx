@@ -32,6 +32,7 @@ export default function Settings() {
   // 头像上传相关状态
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarUploadError, setAvatarUploadError] = useState('')
+  const [isDragging, setIsDragging] = useState(false)
   const avatarFileRef = useRef<HTMLInputElement | null>(null)
 
   const [oldPassword, setOldPassword] = useState('')
@@ -128,11 +129,8 @@ export default function Settings() {
     })
   }
 
-  /** 处理头像本地上传 */
-  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
+  /** 核心上传逻辑：校验 + 压缩 + POST 到 imgbb，成功后写入 avatar 状态 */
+  async function uploadAvatarFile(file: File) {
     setAvatarUploadError('')
 
     // 校验文件类型
@@ -176,6 +174,42 @@ export default function Settings() {
       setAvatarUploading(false)
       // 重置 input，允许重复选择同一文件
       if (avatarFileRef.current) avatarFileRef.current.value = ''
+    }
+  }
+
+  /** 处理头像本地上传（来自 input file 选择） */
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    await uploadAvatarFile(file)
+  }
+
+  /** 拖拽进入：阻止默认行为，标记 dragging 状态以显示高亮 */
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!isDragging) setIsDragging(true)
+  }
+
+  /** 拖拽离开：只有离开 dropzone 本身才取消高亮（忽略子元素冒泡） */
+  function handleDragLeave(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    e.stopPropagation()
+    // relatedTarget 为空或不在当前元素内，才真正离开
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragging(false)
+    }
+  }
+
+  /** 放下图片：取出第一个文件并上传 */
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    if (avatarUploading) return
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      void uploadAvatarFile(file)
     }
   }
 
@@ -295,6 +329,65 @@ export default function Settings() {
           cursor: not-allowed;
           transform: none;
         }
+        /* 拖拽 dropzone */
+        .avatar-dropzone {
+          margin-top: 0.5rem;
+          padding: 1.25rem 1rem;
+          border: 2px dashed var(--line, #d1d5db);
+          border-radius: 12px;
+          background: var(--bg-soft, rgba(0, 0, 0, 0.02));
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          flex-wrap: wrap;
+          cursor: pointer;
+          transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+          position: relative;
+        }
+        .avatar-dropzone:hover {
+          border-color: var(--accent, #f97316);
+        }
+        .avatar-dropzone--dragging {
+          border-color: var(--accent, #f97316);
+          border-style: solid;
+          background: rgba(249, 115, 22, 0.08);
+          transform: scale(1.01);
+        }
+        .avatar-dropzone__icon {
+          font-size: 1.75rem;
+          line-height: 1;
+          filter: grayscale(0.2);
+        }
+        .avatar-dropzone__text {
+          display: flex;
+          flex-direction: column;
+          gap: 0.15rem;
+          flex: 1;
+          min-width: 180px;
+        }
+        .avatar-dropzone__title {
+          font-size: 0.92rem;
+          font-weight: 600;
+          color: var(--text, #1f2937);
+        }
+        .avatar-dropzone__hint {
+          font-size: 0.78rem;
+          color: var(--text-soft, #6b7280);
+        }
+        .avatar-dropzone__preview {
+          width: 56px;
+          height: 56px;
+          border-radius: 50%;
+          object-fit: cover;
+          border: 2px solid var(--line, #d1d5db);
+          background: var(--bg, #f5f5f5);
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+        }
+        .avatar-dropzone__uploading {
+          font-size: 0.82rem;
+          color: var(--accent, #f97316);
+          font-weight: 600;
+        }
       `}</style>
 
       {error && <div className="form__error">{error}</div>}
@@ -323,25 +416,63 @@ export default function Settings() {
               placeholder="https://..."
               maxLength={500}
             />
-            <div className="avatar-upload">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => avatarFileRef.current?.click()}
-                disabled={avatarUploading}
-                style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}
-              >
-                {avatarUploading ? '上传中…' : '本地上传'}
-              </button>
-              {avatar && (
+            {/* 拖拽上传区域：点击或拖拽图片到此处即可上传 */}
+            <div
+              className={`avatar-dropzone ${isDragging ? 'avatar-dropzone--dragging' : ''}`}
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => !avatarUploading && avatarFileRef.current?.click()}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.key === ' ') && !avatarUploading) {
+                  e.preventDefault()
+                  avatarFileRef.current?.click()
+                }
+              }}
+              aria-label="拖拽或点击上传头像"
+            >
+              {avatar && !avatarUploading ? (
                 <img
                   src={avatar}
-                  alt="头像预览"
-                  className="avatar-upload__preview"
+                  alt="当前头像预览"
+                  className="avatar-dropzone__preview"
                   onError={(e) => {
                     ;(e.target as HTMLImageElement).style.display = 'none'
                   }}
                 />
+              ) : (
+                <span className="avatar-dropzone__icon" aria-hidden="true">
+                  {avatarUploading ? '⏳' : '🖼️'}
+                </span>
+              )}
+              <div className="avatar-dropzone__text">
+                {avatarUploading ? (
+                  <span className="avatar-dropzone__uploading">正在上传…</span>
+                ) : (
+                  <span className="avatar-dropzone__title">
+                    {isDragging ? '松开鼠标即可上传' : '拖拽图片到此处，或点击选择文件'}
+                  </span>
+                )}
+                <span className="avatar-dropzone__hint">
+                  支持 PNG / JPG / WebP / GIF，自动压缩到 512px，最大 10MB
+                </span>
+              </div>
+              {!avatarUploading && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    avatarFileRef.current?.click()
+                  }}
+                  disabled={avatarUploading}
+                  style={{ fontSize: '0.85rem', padding: '0.45rem 0.9rem' }}
+                >
+                  选择文件
+                </button>
               )}
               <input
                 ref={avatarFileRef}
@@ -357,7 +488,7 @@ export default function Settings() {
               </p>
             )}
             <p className="form__hint">
-              支持本地图片上传（自动压缩到 512px），也可直接粘贴外链。
+              支持拖拽 / 点击本地上传（自动压缩到 512px），也可直接粘贴外链。
             </p>
           </div>
         </div>
