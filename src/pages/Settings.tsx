@@ -33,7 +33,23 @@ export default function Settings() {
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarUploadError, setAvatarUploadError] = useState('')
   const [isDragging, setIsDragging] = useState(false)
+  const dragCounterRef = useRef(0)
   const avatarFileRef = useRef<HTMLInputElement | null>(null)
+
+  // 阻止页面默认拖拽行为（防止浏览器直接打开拖拽的文件）
+  useEffect(() => {
+    function preventDefaults(e: DragEvent) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    // 必须在 document 上阻止，否则浏览器会打开文件而不是触发 drop
+    document.addEventListener('dragover', preventDefaults)
+    document.addEventListener('drop', preventDefaults)
+    return () => {
+      document.removeEventListener('dragover', preventDefaults)
+      document.removeEventListener('drop', preventDefaults)
+    }
+  }, [])
 
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -184,27 +200,41 @@ export default function Settings() {
     await uploadAvatarFile(file)
   }
 
-  /** 拖拽进入：阻止默认行为，标记 dragging 状态以显示高亮 */
+  /** dragenter：计数器 +1，首次进入时高亮 */
+  function handleDragEnter(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounterRef.current += 1
+    if (dragCounterRef.current === 1) {
+      setIsDragging(true)
+    }
+  }
+
+  /** dragover：必须阻止默认行为并设置 dropEffect，浏览器才允许 drop */
   function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault()
     e.stopPropagation()
-    if (!isDragging) setIsDragging(true)
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy'
+    }
   }
 
-  /** 拖拽离开：只有离开 dropzone 本身才取消高亮（忽略子元素冒泡） */
+  /** dragleave：计数器 -1，真正离开 dropzone 时才取消高亮 */
   function handleDragLeave(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault()
     e.stopPropagation()
-    // relatedTarget 为空或不在当前元素内，才真正离开
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+    dragCounterRef.current -= 1
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0
       setIsDragging(false)
     }
   }
 
-  /** 放下图片：取出第一个文件并上传 */
+  /** drop：重置计数器，取出第一个文件并上传 */
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault()
     e.stopPropagation()
+    dragCounterRef.current = 0
     setIsDragging(false)
     if (avatarUploading) return
     const file = e.dataTransfer.files?.[0]
@@ -419,8 +449,8 @@ export default function Settings() {
             {/* 拖拽上传区域：点击或拖拽图片到此处即可上传 */}
             <div
               className={`avatar-dropzone ${isDragging ? 'avatar-dropzone--dragging' : ''}`}
+              onDragEnter={handleDragEnter}
               onDragOver={handleDragOver}
-              onDragEnter={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onClick={() => !avatarUploading && avatarFileRef.current?.click()}
