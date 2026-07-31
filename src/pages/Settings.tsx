@@ -1,7 +1,11 @@
-import { useEffect, useState, FormEvent } from 'react'
+import { useEffect, useState, useRef, FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { updateProfile, changePassword, getUserProfile, type ProfileUpdate } from '../api'
+
+// imgbb 图床配置（API Key 会在前端 bundle 中暴露，仅适合个人博客场景）
+const IMGBB_API_KEY = 'a3c4d52586dedcc730da4af027c12ebf'
+const IMGBB_UPLOAD_URL = 'https://api.imgbb.com/1/upload'
 
 export default function Settings() {
   const { user, refreshUser } = useAuth()
@@ -24,6 +28,11 @@ export default function Settings() {
   const [success, setSuccess] = useState('')
   const [justSaved, setJustSaved] = useState(false)
   const [previewCss, setPreviewCss] = useState(false)
+
+  // 头像上传相关状态
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarUploadError, setAvatarUploadError] = useState('')
+  const avatarFileRef = useRef<HTMLInputElement | null>(null)
 
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -77,6 +86,97 @@ export default function Settings() {
         </p>
       </div>
     )
+  }
+
+  /** 客户端压缩图片到指定尺寸，返回 base64（不含 data: 前缀） */
+  function compressImage(file: File, maxSize = 512): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onload = () => {
+          let { width, height } = img
+          if (width > height) {
+            if (width > maxSize) {
+              height = Math.round((height * maxSize) / width)
+              width = maxSize
+            }
+          } else {
+            if (height > maxSize) {
+              width = Math.round((width * maxSize) / height)
+              height = maxSize
+            }
+          }
+          const canvas = document.createElement('canvas')
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          if (!ctx) {
+            reject(new Error('无法创建 canvas 上下文'))
+            return
+          }
+          ctx.drawImage(img, 0, 0, width, height)
+          // JPEG 压缩质量 0.85，体积小、画质够用
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+          resolve(dataUrl.split(',')[1])
+        }
+        img.onerror = () => reject(new Error('图片加载失败'))
+        img.src = e.target?.result as string
+      }
+      reader.onerror = () => reject(new Error('文件读取失败'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  /** 处理头像本地上传 */
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setAvatarUploadError('')
+
+    // 校验文件类型
+    if (!file.type.startsWith('image/')) {
+      setAvatarUploadError('请选择图片文件（PNG / JPG / WebP 等）')
+      return
+    }
+
+    // 校验文件大小（10MB 上限，压缩前）
+    if (file.size > 10 * 1024 * 1024) {
+      setAvatarUploadError('图片大小不能超过 10MB')
+      return
+    }
+
+    setAvatarUploading(true)
+    try {
+      // 客户端压缩到 512px，节省流量
+      const base64 = await compressImage(file, 512)
+      const formData = new FormData()
+      formData.append('image', base64)
+
+      const res = await fetch(`${IMGBB_UPLOAD_URL}?key=${IMGBB_API_KEY}`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null)
+        throw new Error(errBody?.error?.message || `HTTP ${res.status}`)
+      }
+
+      const data = await res.json()
+      if (data?.data?.url) {
+        setAvatar(data.data.url)
+      } else {
+        throw new Error('返回数据格式异常')
+      }
+    } catch (err) {
+      setAvatarUploadError(err instanceof Error ? err.message : '上传失败')
+    } finally {
+      setAvatarUploading(false)
+      // 重置 input，允许重复选择同一文件
+      if (avatarFileRef.current) avatarFileRef.current.value = ''
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -199,6 +299,42 @@ export default function Settings() {
               placeholder="https://..."
               maxLength={500}
             />
+            <div className="avatar-upload">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => avatarFileRef.current?.click()}
+                disabled={avatarUploading}
+                style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}
+              >
+                {avatarUploading ? '上传中…' : '本地上传'}
+              </button>
+              {avatar && (
+                <img
+                  src={avatar}
+                  alt="头像预览"
+                  className="avatar-upload__preview"
+                  onError={(e) => {
+                    ;(e.target as HTMLImageElement).style.display = 'none'
+                  }}
+                />
+              )}
+              <input
+                ref={avatarFileRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleAvatarUpload}
+              />
+            </div>
+            {avatarUploadError && (
+              <p className="form__hint" style={{ color: 'var(--danger, #ef4444)' }}>
+                {avatarUploadError}
+              </p>
+            )}
+            <p className="form__hint">
+              支持本地图片上传（自动压缩到 512px），也可直接粘贴外链。
+            </p>
           </div>
         </div>
 
@@ -399,6 +535,46 @@ export default function Settings() {
           </button>
         </div>
       </form>
+
+      {/* 第三方账号绑定：GitHub OAuth */}
+      <div className="settings__section settings__section--oauth">
+        <h2 className="settings__section-title">第三方账号</h2>
+        <p className="settings__section-desc">
+          绑定 GitHub 账号后，可以使用 GitHub 快速登录，并在个人主页展示 GitHub 图标。
+        </p>
+        <div className="oauth-bind-card">
+          <div className="oauth-bind-card__icon">
+            <GithubIcon />
+          </div>
+          <div className="oauth-bind-card__info">
+            <div className="oauth-bind-card__name">GitHub</div>
+            {/* 已通过 GitHub 注册（无密码）或已设置 social_github 视为已绑定 */}
+            {(!user.password_hash || socialGithub) ? (
+              <div className="oauth-bind-card__status oauth-bind-card__status--bound">
+                {socialGithub ? (
+                  <>已绑定：@{socialGithub}</>
+                ) : (
+                  <>已通过 GitHub 登录</>
+                )}
+              </div>
+            ) : (
+              <div className="oauth-bind-card__status oauth-bind-card__status--unbound">
+                未绑定
+              </div>
+            )}
+          </div>
+          <div className="oauth-bind-card__action">
+            {/* 已绑定但仍想重新绑定（例如更换账号）也允许 */}
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => { window.location.href = '/api/auth/github?bind=1' }}
+            >
+              {(!user.password_hash || socialGithub) ? '重新绑定' : '绑定 GitHub'}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="settings__section settings__section--password">
         <h2 className="settings__section-title">
