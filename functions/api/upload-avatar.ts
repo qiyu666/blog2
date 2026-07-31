@@ -65,3 +65,4 @@ export const onRequestPost: PagesFunction<{ DB: D1Database; IMGBB_API_KEY: strin
 
   // 7. 返回图片 URL 给前端
   return json({ url: data.data.url })
+}
