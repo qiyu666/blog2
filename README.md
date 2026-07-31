@@ -22,28 +22,39 @@
 - 文章自定义 JS（用户可为单篇文章注入自定义背景、音乐等）
 - FTS5 全文搜索（覆盖标题、摘要、正文、标签）
 - RSS Feed 与 Sitemap
+- **Markdown 代码块语法高亮**（PrismJS 15 种语言 + Catppuccin 主题）
+- **代码块一键复制**（复制按钮 + 成功提示）
+- **文章阅读进度条**（顶部渐变进度条，实时跟踪滚动位置）
 
 ### 社交
 - 评论系统（支持嵌套回复、评论点赞）
+- **评论 @用户补全**（输入 @ 弹出用户下拉，上下键选择 + Enter 确认）
+- **@提及通知**（评论/回复中提及的用户会收到通知提醒）
 - 文章点赞与收藏
 - 用户关注 / 粉丝体系
 - 站内私信
-- 通知系统（评论回复、点赞、收藏、关注、私信五种类型，支持已读/未读/删除）
+- 通知系统（评论回复、点赞、收藏、关注、私信、@提及六种类型，支持已读/未读/删除）
 
 ### 用户
 - 用户名/密码注册与登录
 - GitHub OAuth 登录（新用户引导设置显示名称和密码）
 - 个人主页（头像、渐变 Banner、统计栏、管理员徽章、关注/私信按钮）
 - 个人主页可视化自定义（拖拽排序模块、自定义 CSS、背景图）
+- **个人主页作品集**（分类筛选 + 文章卡片列表 + 客户端分页）
+- **成就徽章系统**（7 种徽章：新手、勤奋、高产、人气、热门、互动、优质）
+- **互动数据统计**（被点赞、被收藏、被评论总数展示）
+- **社交联系方式**（GitHub、Twitter/X、QQ、微信、Telegram、B站、邮箱，共 7 种平台图标展示）
 - 安全设置（修改密码、TOTP 2FA）
 
 ### 管理后台
 - 仪表盘（数据概览）
 - 文章管理（编辑/删除/置顶/精选）
+- **文章批量操作**（多选 + 批量删除/发布/取消发布/置顶/取消置顶）
 - 评论管理
 - 用户管理（角色提升/降级）
 - Bug 反馈管理
 - 数据分析（访问量、热门文章、用户增长）
+- **数据分析看板增强**（7 天访问趋势折线图、热门文章 Top10 表格、30 天用户增长柱状图）
 - 分类与标签管理
 
 ### 安全
@@ -55,10 +66,13 @@
 ### UI/UX
 - 现代化设计，玻璃拟态（Glassmorphism）风格
 - 亮色/暗色模式无缝切换
+- **多语言 i18n 支持**（中文简体 / English，react-i18next 实现，偏好本地存储）
 - 响应式布局（桌面/平板/移动端）
 - 全局音乐播放器（播放列表、跨页面状态同步）
 - 页面切换自动滚动到顶部
 - 微动画与过渡效果
+- **404 页面美化**（渐变浮动动画、15 秒倒计时、返回首页/搜索按钮）
+- **设置页保存反馈**（按钮状态变化、右下角浮动 Toast、自动滚动到顶部）
 
 ## 项目结构
 
@@ -70,14 +84,15 @@ blog2/
 │   │   ├── Header.tsx          #     导航栏 + 主题切换 + 通知菜单
 │   │   ├── Footer.tsx          #     页脚
 │   │   ├── Layout.tsx          #     布局骨架
+│   │   ├── LanguageSwitcher.tsx#     多语言切换器（中/英）
 │   │   ├── MarkdownEditor.tsx  #     Markdown 编辑器
 │   │   ├── MusicPlayer.tsx     #     全局音乐播放器
 │   │   ├── PostCard.tsx        #     文章卡片
 │   │   ├── PostForm.tsx        #     文章发布/编辑表单
 │   │   ├── PostSidebar.tsx     #     文章页侧边栏
-│   │   ├── Sidebar.tsx         #     首页侧边栏
 │   │   ├── SearchBar.tsx       #     搜索栏
 │   │   ├── SEO.tsx             #     SEO meta 标签
+│   │   ├── SocialLinks.tsx     #     社交联系方式图标（支持文章页/用户主页复用）
 │   │   └── NotificationsMenu.tsx#    通知下拉菜单
 │   ├── pages/                  #   页面组件
 │   │   ├── Home.tsx            #     首页
@@ -148,7 +163,7 @@ blog2/
 │   ├── _headers                #   安全响应头
 │   └── favicon.svg             #   站点图标
 ├── schema.sql                  # 数据库初始 schema
-├── schema-v2.sql ~ v8.sql      # 增量迁移脚本
+├── schema-v2.sql ~ v9.sql      # 增量迁移脚本（v9 添加社交联系方式字段）
 ├── wrangler.jsonc              # Cloudflare 配置
 ├── vite.config.ts              # Vite 构建配置
 ├── tsconfig.json               # TypeScript 配置
@@ -202,12 +217,14 @@ npx wrangler d1 execute blog-db --file=./schema.sql
 npx wrangler d1 execute blog-db --remote --file=./schema.sql
 ```
 
-按顺序执行增量迁移（v2 → v8）：
+按顺序执行增量迁移（v2 → v9）：
 
 ```bash
 npx wrangler d1 execute blog-db --file=./schema-v2.sql
 npx wrangler d1 execute blog-db --file=./schema-v3.sql
-# ...依次执行到 v8
+# ...依次执行到 v9
+# v9 添加社交联系方式字段（GitHub/Twitter/QQ/微信/Telegram/B站/邮箱）
+npx wrangler d1 execute blog-db --file=./schema-v9.sql
 ```
 
 ### 4. 配置环境变量
