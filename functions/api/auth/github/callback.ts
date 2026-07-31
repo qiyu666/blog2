@@ -93,6 +93,15 @@ export async function onRequestGet(context: {
 
     if (existingByUsername) {
       userId = existingByUsername.id
+      // 老用户登录：如果 social_github 为空，自动填充 GitHub 用户名
+      try {
+        await env.DB
+          .prepare('UPDATE users SET social_github = ? WHERE id = ? AND (social_github IS NULL OR social_github = \'\')')
+          .bind(githubUser.login, userId)
+          .run()
+      } catch {
+        // social_github 列不存在时静默跳过
+      }
     } else {
       const existingByEmail = await env.DB
         .prepare('SELECT id FROM users WHERE email = ?')
@@ -110,10 +119,10 @@ export async function onRequestGet(context: {
 
       const result = await env.DB
         .prepare(
-          `INSERT INTO users (username, email, display_name, avatar, bio, password_hash, salt, role)
-           VALUES (?, ?, ?, ?, ?, '', '', 'member')`
+          `INSERT INTO users (username, email, display_name, avatar, bio, password_hash, salt, role, social_github)
+           VALUES (?, ?, ?, ?, ?, '', '', 'member', ?)`
         )
-        .bind(githubUser.login, emailToUse, displayName, avatar, bio)
+        .bind(githubUser.login, emailToUse, displayName, avatar, bio, githubUser.login)
         .run()
 
       userId = Number(result.lastInsertRowId || 0)
