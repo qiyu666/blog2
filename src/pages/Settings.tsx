@@ -3,9 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { updateProfile, changePassword, getUserProfile, type ProfileUpdate } from '../api'
 
-// imgbb 图床配置（API Key 会在前端 bundle 中暴露，仅适合个人博客场景）
-const IMGBB_API_KEY = 'a3c4d52586dedcc730da4af027c12ebf'
-const IMGBB_UPLOAD_URL = 'https://api.imgbb.com/1/upload'
+// imgbb 图床上传通过后端代理 /api/upload-avatar，API Key 存在服务端环境变量中
 
 export default function Settings() {
   const { user, refreshUser } = useAuth()
@@ -38,16 +36,15 @@ export default function Settings() {
 
   // 阻止页面默认拖拽行为（防止浏览器直接打开拖拽的文件）
   useEffect(() => {
-    function preventDefaults(e: DragEvent) {
+    function preventDefault(e: DragEvent) {
       e.preventDefault()
-      e.stopPropagation()
     }
-    // 必须在 document 上阻止，否则浏览器会打开文件而不是触发 drop
-    document.addEventListener('dragover', preventDefaults)
-    document.addEventListener('drop', preventDefaults)
+    // 只在 document 上阻止默认行为，不 stopPropagation，避免干扰 React 合成事件
+    document.addEventListener('dragover', preventDefault)
+    document.addEventListener('drop', preventDefault)
     return () => {
-      document.removeEventListener('dragover', preventDefaults)
-      document.removeEventListener('drop', preventDefaults)
+      document.removeEventListener('dragover', preventDefault)
+      document.removeEventListener('drop', preventDefault)
     }
   }, [])
 
@@ -145,7 +142,7 @@ export default function Settings() {
     })
   }
 
-  /** 核心上传逻辑：校验 + 压缩 + POST 到 imgbb，成功后写入 avatar 状态 */
+  /** 核心上传逻辑：校验 + 压缩 + POST 到后端代理，成功后写入 avatar 状态 */
   async function uploadAvatarFile(file: File) {
     setAvatarUploadError('')
 
@@ -165,22 +162,22 @@ export default function Settings() {
     try {
       // 客户端压缩到 512px，节省流量
       const base64 = await compressImage(file, 512)
-      const formData = new FormData()
-      formData.append('image', base64)
 
-      const res = await fetch(`${IMGBB_UPLOAD_URL}?key=${IMGBB_API_KEY}`, {
+      // 通过后端代理上传，API Key 不暴露在前端
+      const res = await fetch('/api/upload-avatar', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64 }),
       })
 
       if (!res.ok) {
         const errBody = await res.json().catch(() => null)
-        throw new Error(errBody?.error?.message || `HTTP ${res.status}`)
+        throw new Error(errBody?.error || `HTTP ${res.status}`)
       }
 
       const data = await res.json()
-      if (data?.data?.url) {
-        setAvatar(data.data.url)
+      if (data?.url) {
+        setAvatar(data.url)
       } else {
         throw new Error('返回数据格式异常')
       }
