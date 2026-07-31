@@ -46,14 +46,35 @@ function renderMarkdown(md: string): string {
   let codeLang = ''
 
   function inline(text: string): string {
-    return text
+    // 第 1 步：先提取 Markdown 链接和图片（避免 &< > 转义破坏 URL）
+    const placeholders: string[] = []
+    const stash = (html: string) => {
+      placeholders.push(html)
+      return `\x00PLACEHOLDER_${placeholders.length - 1}\x00`
+    }
+    let processed = text
+      // ![alt](url)
+      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) =>
+        stash(`<img src="${url}" alt="${alt}" style="max-width:100%;border-radius:8px;margin:0.5rem 0;" />`),
+      )
+      // [text](url)
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) =>
+        stash(`<a href="${url}" target="_blank" rel="noreferrer noopener">${label}</a>`),
+      )
+    // 第 2 步：转义剩余的 HTML 特殊字符和行内格式
+    processed = processed
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
+    // 第 3 步：还原占位符
+    processed = processed.replace(
+      /\x00PLACEHOLDER_(\d+)\x00/g,
+      (_, i) => placeholders[Number(i)] ?? '',
+    )
+    return processed
   }
 
   for (const line of lines) {
