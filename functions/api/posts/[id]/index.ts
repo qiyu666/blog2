@@ -30,7 +30,7 @@ async function getPostWithStats(db: D1Database, idParam: string) {
   if (numeric) {
     post = await db
       .prepare(
-        `SELECT p.*, u.username AS author_username,
+        `SELECT p.*, u.username AS author_username, u.avatar AS author_avatar,
           (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS likes_count,
           (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comments_count
          FROM posts p LEFT JOIN users u ON p.author_id = u.id
@@ -43,7 +43,7 @@ async function getPostWithStats(db: D1Database, idParam: string) {
 
   post = await db
     .prepare(
-      `SELECT p.*, u.username AS author_username,
+      `SELECT p.*, u.username AS author_username, u.avatar AS author_avatar,
         (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS likes_count,
         (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comments_count
        FROM posts p LEFT JOIN users u ON p.author_id = u.id
