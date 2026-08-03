@@ -1,6 +1,7 @@
 // GET /api/admin/migrations
 // 显示当前 D1 迁移状态，以及待执行的迁移列表。
-import { json, error, requireAdmin } from '../_helpers'
+import { json, error } from '../_helpers'
+import { getSession } from '../_auth'
 
 const LATEST = 11
 
@@ -8,8 +9,10 @@ export async function onRequestGet(context: {
   request: Request
   env: { DB: D1Database }
 }) {
-  const auth = await requireAdmin(context.request, context.env.DB)
-  if (auth instanceof Response) return auth
+  const { request, env } = context
+  const { user } = await getSession(request, env.DB)
+  if (!user) return error('请先登录', 401)
+  if (user.role !== 'admin') return error('无权访问', 403)
 
   // 查询当前版本
   const row = await context.env.DB.prepare('PRAGMA user_version').first<{ user_version: number }>()
