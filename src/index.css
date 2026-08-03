@@ -2013,7 +2013,24 @@ input, textarea, select {
   position: sticky;
   top: calc(var(--space-lg) + 60px);
   max-height: calc(100vh - 200px);
-  overflow-y: auto;
+  overflow: hidden;
+  transition: max-height 0.25s ease, padding 0.25s ease;
+}
+
+.toc--collapsed {
+  max-height: 48px;
+  padding-bottom: var(--space-sm);
+}
+
+.toc__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+
+.toc--collapsed .toc__header {
+  margin-bottom: 0;
 }
 
 .toc__title {
@@ -2023,7 +2040,27 @@ input, textarea, select {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--text-tertiary);
-  margin: 0 0 var(--space-sm);
+  margin: 0;
+}
+
+.toc__toggle {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  transition: all var(--transition);
+}
+
+.toc__toggle:hover {
+  background: var(--bg-deep);
+  color: var(--ink);
 }
 
 .toc__list {
@@ -2033,10 +2070,22 @@ input, textarea, select {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow-y: auto;
+  max-height: calc(100vh - 300px);
+  padding-right: 4px;
+}
+
+.toc__list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.toc__list::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 2px;
 }
 
 .toc__item {
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   line-height: 1.4;
 }
 
@@ -2053,6 +2102,16 @@ input, textarea, select {
   text-decoration: none;
   transition: all 0.15s ease;
   border-left: 2px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.toc__item-text {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .toc__item a:hover {
@@ -2065,6 +2124,13 @@ input, textarea, select {
   font-weight: 500;
   border-left-color: var(--accent, #c5673a);
   background: var(--surface-hover, rgba(0,0,0,0.03));
+}
+
+.toc__collapsed-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
+  padding: 4px 0;
 }
 
 /* === Archives Page === */
