@@ -43,6 +43,7 @@ export default function Header() {
   });
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Ctrl+K / Cmd+K 快捷键打开搜索面板
   useEffect(() => {
@@ -89,6 +90,8 @@ export default function Header() {
     navigate('/');
   };
 
+  const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
+
   return (
     <>
     <SearchPalette open={searchOpen} onClose={closeSearch} />
@@ -98,7 +101,8 @@ export default function Header() {
           Marginalia<span className="brand__dot">.</span>
         </Link>
         <SearchBar />
-        <nav className="nav">
+        {/* Desktop nav */}
+        <nav className="nav nav--desktop">
           <NavLink to="/" className="nav__link" end>
             {t('nav.forum')}
           </NavLink>
@@ -162,8 +166,108 @@ export default function Header() {
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
         </nav>
+
+        {/* Mobile actions */}
+        <div className="nav--mobile-actions">
+          <button
+            type="button"
+            className="nav__theme-toggle"
+            onClick={toggleTheme}
+            aria-label={t('common.toggleTheme')}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
+          <button
+            type="button"
+            className="nav__hamburger"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="菜单"
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+        </div>
       </div>
     </header>
+
+    {/* Mobile drawer menu */}
+    {mobileMenuOpen && (
+      <div className="mobile-menu-overlay" onClick={closeMobileMenu}>
+        <div className="mobile-menu" onClick={(e) => e.stopPropagation()}>
+          <div className="mobile-menu__header">
+            <span className="mobile-menu__brand">Marginalia</span>
+            <button
+              type="button"
+              className="mobile-menu__close"
+              onClick={closeMobileMenu}
+              aria-label="关闭"
+            >
+              ×
+            </button>
+          </div>
+          <nav className="mobile-menu__nav" onClick={closeMobileMenu}>
+            <NavLink to="/" className="mobile-menu__link" end>
+              {t('nav.forum')}
+            </NavLink>
+            <NavLink to="/history" className="mobile-menu__link">
+              {t('nav.history')}
+            </NavLink>
+            {user && (
+              <NavLink to="/favorites" className="mobile-menu__link">
+                {t('nav.favorites')}
+              </NavLink>
+            )}
+            {user && (
+              <NavLink to="/drafts" className="mobile-menu__link">
+                {t('nav.drafts')}
+              </NavLink>
+            )}
+            {user?.role === 'admin' && (
+              <NavLink to="/admin" className="mobile-menu__link">
+                {t('nav.admin')}
+              </NavLink>
+            )}
+            {user ? (
+              <>
+                <NavLink to="/mailbox" className="mobile-menu__link">
+                  {t('nav.mailbox')}
+                  {unreadCount > 0 && (
+                    <span className="nav__badge">{unreadCount}</span>
+                  )}
+                </NavLink>
+                <NavLink to="/new" className="mobile-menu__link mobile-menu__link--accent">
+                  {t('nav.newPost')}
+                </NavLink>
+                <NavLink to={`/${user.username}`} className="mobile-menu__link">
+                  {user.display_name || user.username}
+                </NavLink>
+                <button
+                  type="button"
+                  className="mobile-menu__link mobile-menu__link--btn"
+                  onClick={() => { handleLogout(); closeMobileMenu(); }}
+                >
+                  {t('nav.logout')}
+                </button>
+              </>
+            ) : (
+              <>
+                <NavLink to="/login" className="mobile-menu__link">
+                  {t('nav.login')}
+                </NavLink>
+                <NavLink to="/register" className="mobile-menu__link mobile-menu__link--accent">
+                  {t('nav.register')}
+                </NavLink>
+              </>
+            )}
+            <div className="mobile-menu__divider"></div>
+            <div className="mobile-menu__lang">
+              <LanguageSwitcher />
+            </div>
+          </nav>
+        </div>
+      </div>
+    )}
     </>
   );
 }

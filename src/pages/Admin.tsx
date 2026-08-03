@@ -782,6 +782,33 @@ export default function Admin() {
         </div>
       </main>
 
+      {/* 移动端底部 Tab Bar */}
+      <nav className="admin-mobile-tabs">
+        {([
+          { key: 'dashboard', icon: '📊', label: '概览' },
+          { key: 'posts', icon: '📝', label: '文章' },
+          { key: 'users', icon: '👥', label: '用户' },
+          { key: 'categories', icon: '📂', label: '分类' },
+          { key: 'comments', icon: '💬', label: '评论' },
+          { key: 'bugs', icon: '🐛', label: '反馈' },
+          { key: 'reports', icon: '🚩', label: '举报' },
+          { key: 'settings', icon: '⚙️', label: '设置' },
+        ] as { key: Tab; icon: string; label: string }[]).map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            className={`admin-mobile-tab${activeTab === tab.key ? ' active' : ''}`}
+            onClick={() => {
+              setActiveTab(tab.key)
+              load(tab.key)
+            }}
+          >
+            <span className="admin-mobile-tab__icon">{tab.icon}</span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </nav>
+
       {/* 分类编辑对话框 */}
       {categoryModalOpen && (
         <div className="modal-overlay" onClick={closeCategoryModal}>
