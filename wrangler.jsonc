@@ -1,6 +1,6 @@
 {
   "name": "blog2",
-  "pages_build_output_dir": "./dist",
+  "main": "src/index.ts",
   "compatibility_date": "2026-01-01",
   "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
@@ -10,6 +10,9 @@
       "database_id": "83d5ea81-07b7-4ff2-80eb-a9507b72e610"
     }
   ],
+  "assets": {
+    "directory": "./dist"
+  },
   "vars": {
     "ADMIN_SECRET": "58fd55dc4479f407ac2124cef758074a9cf3f68ffa72755d",
     "GITHUB_CLIENT_ID": "Ov23lijgt2dwgubIOyfO",
