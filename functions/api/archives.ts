@@ -1,6 +1,6 @@
 // GET /api/archives
 // 返回文章归档（按年-月分组，用于归档页面展示）
-import { json } from '../_helpers'
+import { json } from './_helpers'
 
 export async function onRequestGet(context: { env: { DB: D1Database } }) {
   const rows = await context.env.DB
