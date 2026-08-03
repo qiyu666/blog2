@@ -117,7 +117,7 @@ export default function Mailbox() {
                 <Link to={`/mailbox/${m.id}`} className="mail-item__main">
                   <div className="mail-item__avatar">
                     {peerAvatar ? (
-                      <img src={peerAvatar} alt={peer} />
+                      <img src={peerAvatar} alt={peer} loading="lazy" width={40} height={40} />
                     ) : (
                       <span className="comment__avatar-fallback">
                         {(peer || '?').charAt(0).toUpperCase()}

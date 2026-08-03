@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { Post, SearchResult } from '../types';
+import { useReadingHistory } from '../hooks/useReadingHistory';
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr + 'Z');
@@ -10,6 +11,17 @@ function estimateReadTime(text: string): number {
   const wordsPerMinute = 200;
   const wordCount = text.split(/\s+/).length;
   return Math.max(1, Math.ceil(wordCount / wordsPerMinute));
+}
+
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts
+  const min = Math.floor(diff / 60000)
+  if (min < 60) return `${min} 分钟前读过`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr} 小时前读过`
+  const day = Math.floor(hr / 24)
+  if (day < 30) return `${day} 天前读过`
+  return '读过'
 }
 
 type PostCardData = Post | SearchResult;
@@ -23,12 +35,14 @@ export default function PostCard({ post, index = 0 }: { post: PostCardData; inde
   const isPinned = isPost(post) ? !!post.is_pinned : false;
   const isFeatured = isPost(post) ? !!post.is_featured : false;
   const readTime = isPost(post) ? estimateReadTime(post.content) : 5;
+  const { history } = useReadingHistory();
+  const readItem = history.find((i) => i.slug === post.slug);
 
   const animationDelay = `${(index % 9) * 0.05 + 0.1}s`;
 
   return (
     <article
-      className="post-card fade-up"
+      className={`post-card fade-up${readItem ? ' post-card--read' : ''}`}
       style={{ animationDelay }}
     >
       <Link to={`/post/${post.slug}`} className="post-card__image">
@@ -37,6 +51,11 @@ export default function PostCard({ post, index = 0 }: { post: PostCardData; inde
         )}
       </Link>
       <span className="post-card__category">{post.category}</span>
+      {readItem && (
+        <span className="post-card__read-mark" title={timeAgo(readItem.visited_at)}>
+          ✓ 已读{readItem.read_progress ? ` ${readItem.read_progress}%` : ''}
+        </span>
+      )}
       {(isPinned || isFeatured) && (
         <div className="post-card__badges">
           {isPinned && <span className="post-badge post-badge--pinned">置顶</span>}

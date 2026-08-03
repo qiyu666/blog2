@@ -6,6 +6,7 @@ export type NotificationType =
   | 'comment_reply'   // someone replied to my comment
   | 'post_comment'    // someone commented on my post
   | 'like'            // someone liked my post
+  | 'comment_like'    // someone liked my comment
   | 'favorite'        // someone favorited my post
   | 'follow'          // someone followed me
   | 'message'         // someone sent me a站内信
@@ -67,6 +68,10 @@ export async function notify(input: NotifyInput): Promise<void> {
           case 'like':
             subject = `${actorName} 赞了你的帖子`
             body = `${actorName} 赞了你的帖子。`
+            break
+          case 'comment_like':
+            subject = `${actorName} 赞了你的评论`
+            body = `${actorName} 赞了你的评论。查看：${input.postId ? '/post/' + input.postId : ''}`
             break
           case 'favorite':
             subject = `${actorName} 收藏了你的帖子`

@@ -146,7 +146,7 @@ export default function NotificationsMenu() {
                   <>
                     <div className="notif-item__avatar">
                       {n.actor_avatar ? (
-                        <img src={n.actor_avatar} alt="" />
+                        <img src={n.actor_avatar} alt="" loading="lazy" width={36} height={36} />
                       ) : (
                         <span>{n.actor_username?.charAt(0).toUpperCase() || '系'}</span>
                       )}

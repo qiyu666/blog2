@@ -249,7 +249,7 @@ export default function Home() {
               {featuredPosts.map((post, i) => (
                 <Link to={`/post/${post.slug}`} key={post.id} className={`featured-grid__item featured-grid__item--${i === 0 ? 'large' : 'small'}`}>
                   <div className="featured-grid__image">
-                    {post.cover_image && <img src={post.cover_image} alt="" />}
+                    {post.cover_image && <img src={post.cover_image} alt="" loading="lazy" />}
                     <div className="featured-grid__gradient"></div>
                     <div className="featured-grid__badges">
                       <span className="featured-grid__badge">

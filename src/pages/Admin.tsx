@@ -866,7 +866,7 @@ function DashboardView({
                 <div key={u.id} className="recent-item">
                   <div className="recent-item__user">
                     {u.avatar ? (
-                      <img src={u.avatar} alt="" className="recent-item__avatar" />
+                      <img src={u.avatar} alt="" className="recent-item__avatar" loading="lazy" />
                     ) : (
                       <div className="recent-item__avatar recent-item__avatar--placeholder">
                         {u.username[0]?.toUpperCase()}
@@ -947,7 +947,7 @@ function UsersView({
                   <td className="admin-table__user">
                     <div className="admin-user-cell">
                       {u.avatar ? (
-                        <img src={u.avatar} alt="" className="admin-user-cell__avatar" />
+                        <img src={u.avatar} alt="" className="admin-user-cell__avatar" loading="lazy" />
                       ) : (
                         <div className="admin-user-cell__avatar admin-user-cell__avatar--placeholder">
                           {u.username[0]?.toUpperCase()}

@@ -65,7 +65,7 @@ export default function MessageDetail() {
       <div className="message-detail__head">
         <div className="message-detail__avatar">
           {peerAvatar ? (
-            <img src={peerAvatar} alt={peer} />
+            <img src={peerAvatar} alt={peer} loading="lazy" width={48} height={48} />
           ) : (
             <span className="comment__avatar-fallback">
               {(peer || '?').charAt(0).toUpperCase()}

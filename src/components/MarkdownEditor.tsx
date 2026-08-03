@@ -209,7 +209,7 @@ function renderMarkdown(md: string): string {
     let processed = text
       // ![alt](url)
       .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) =>
-        stash(`<img src="${url}" alt="${alt}" style="max-width:100%;border-radius:8px;" />`),
+        stash(`<img src="${url}" alt="${alt}" loading="lazy" style="max-width:100%;border-radius:8px;" />`),
       )
       // [text](url)
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) =>

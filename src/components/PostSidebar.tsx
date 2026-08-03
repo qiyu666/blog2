@@ -86,9 +86,13 @@ export default function PostSidebar({ post }: PostSidebarProps) {
           <h4 className="post-sidebar__title">标签</h4>
           <div className="post-sidebar__tags">
             {tags.map((tag) => (
-              <span key={tag} className="post-sidebar__tag">
+              <Link
+                key={tag}
+                to={`/tag/${encodeURIComponent(tag)}`}
+                className="post-sidebar__tag"
+              >
                 #{tag}
-              </span>
+              </Link>
             ))}
           </div>
         </div>

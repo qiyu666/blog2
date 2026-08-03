@@ -64,6 +64,7 @@ export interface Comment {
   parent_id: number | null;
   content: string;
   created_at: string;
+  updated_at?: string;
   author_username: string;
   author_avatar: string;
   likes_count?: number;

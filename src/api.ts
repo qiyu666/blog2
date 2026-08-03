@@ -133,6 +133,13 @@ export async function deleteComment(id: number): Promise<void> {
   await request<void>(`/api/comments/${id}`, { method: 'DELETE' });
 }
 
+export async function editComment(id: number, content: string): Promise<Comment> {
+  return request<Comment>(`/api/comments/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ content }),
+  });
+}
+
 // ===== Likes =====
 export async function getLikeStatus(postSlug: string): Promise<LikeStatus> {
   return request<LikeStatus>(`/api/posts/${postSlug}/likes`);
@@ -403,6 +410,52 @@ export async function updateProfile(
 export async function searchPosts(query: string): Promise<{ query: string; posts: SearchResult[] }> {
   return request<{ query: string; posts: SearchResult[] }>(
     `/api/search?q=${encodeURIComponent(query)}`
+  );
+}
+
+// ===== 归档 =====
+export interface ArchiveGroup {
+  ym: string;
+  year: number;
+  month: number;
+  count: number;
+  posts: Array<{
+    id: number;
+    title: string;
+    slug: string;
+    category: string;
+    created_at: string;
+    author_username: string | null;
+  }>;
+}
+
+export async function getArchives(): Promise<{ archives: ArchiveGroup[]; total: number }> {
+  return request<{ archives: ArchiveGroup[]; total: number }>('/api/archives');
+}
+
+// ===== 标签云 =====
+export interface TagStat {
+  name: string;
+  count: number;
+}
+
+export async function getTags(): Promise<TagStat[]> {
+  const posts = await getPosts();
+  const map = new Map<string, number>();
+  for (const p of posts) {
+    for (const t of p.tags.split(',').map((s) => s.trim()).filter(Boolean)) {
+      map.set(t, (map.get(t) || 0) + 1);
+    }
+  }
+  return Array.from(map.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+export async function getPostsByTag(tag: string): Promise<Post[]> {
+  const posts = await getPosts();
+  return posts.filter((p) =>
+    p.tags.split(',').map((t) => t.trim()).includes(tag)
   );
 }
 

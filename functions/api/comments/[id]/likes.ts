@@ -5,6 +5,7 @@
 
 import { json, error } from '../../_helpers'
 import { getSession } from '../../_auth'
+import { notify } from '../../_notifications'
 
 async function resolveCommentId(db: D1Database, idParam: string): Promise<number | null> {
   if (!/^\d+$/.test(idParam)) return null
@@ -74,7 +75,21 @@ export async function onRequestPost(context: {
         .prepare('INSERT INTO comment_likes (comment_id, user_id) VALUES (?, ?)')
         .bind(commentId, user.id)
         .run()
-      // 评论点赞不发送通知（保持简单）
+      // 通知评论作者被点赞
+      const cmt = await env.DB
+        .prepare('SELECT user_id, post_id FROM comments WHERE id = ?')
+        .bind(commentId)
+        .first<{ user_id: number; post_id: number }>()
+      if (cmt?.user_id) {
+        void notify({
+          db: env.DB,
+          userId: cmt.user_id,
+          actorId: user.id,
+          type: 'comment_like',
+          postId: cmt.post_id,
+          commentId,
+        })
+      }
       return json({ liked: true, action: 'liked' }, 201)
     }
   } catch (err) {

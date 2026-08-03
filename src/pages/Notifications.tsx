@@ -108,7 +108,7 @@ export default function Notifications() {
               >
                 <div className="notif-list__avatar">
                   {n.actor_avatar ? (
-                    <img src={n.actor_avatar} alt="" />
+                    <img src={n.actor_avatar} alt="" loading="lazy" width={40} height={40} />
                   ) : (
                     <span>{n.actor_username?.charAt(0).toUpperCase() || '系'}</span>
                   )}

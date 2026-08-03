@@ -23,6 +23,7 @@ import {
   getComments,
   createComment,
   deleteComment,
+  editComment,
   getLikeStatus,
   toggleLike,
   toggleFavorite,
@@ -32,8 +33,10 @@ import {
   getUserProfile,
 } from '../api'
 import { useAuth } from '../auth/AuthContext'
+import { useReadingHistory } from '../hooks/useReadingHistory'
 import SEO from '../components/SEO'
 import PostSidebar from '../components/PostSidebar'
+import TableOfContents from '../components/TableOfContents'
 import SocialLinks from '../components/SocialLinks'
 import DOMPurify from 'dompurify'
 
@@ -45,6 +48,30 @@ function renderMarkdown(md: string): string {
   let inCode = false
   let codeBuffer: string[] = []
   let codeLang = ''
+  const slugCounter = new Map<string, number>()
+
+  // 为标题生成稳定的 slug 锚点，重名时自动追加 -2 -3
+  function headingId(text: string): string {
+    const base = text
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s-]/gu, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      || 'section'
+    const n = (slugCounter.get(base) || 0) + 1
+    slugCounter.set(base, n)
+    return n === 1 ? base : `${base}-${n}`
+  }
+
+  // 把 inline() 产生的 HTML 还原为纯文本，供 headingId 使用
+  function stripInline(html: string): string {
+    return html
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+  }
 
   function inline(text: string): string {
     // 第 1 步：先提取 Markdown 链接和图片（避免 &< > 转义破坏 URL）
@@ -56,7 +83,7 @@ function renderMarkdown(md: string): string {
     let processed = text
       // ![alt](url)
       .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) =>
-        stash(`<img src="${url}" alt="${alt}" style="max-width:100%;border-radius:8px;margin:0.5rem 0;" />`),
+        stash(`<img src="${url}" alt="${alt}" loading="lazy" style="max-width:100%;border-radius:8px;margin:0.5rem 0;" />`),
       )
       // [text](url)
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) =>
@@ -98,19 +125,29 @@ function renderMarkdown(md: string): string {
     }
     if (/^#####\s/.test(line)) {
       if (inList) { html += '</ul>\n'; inList = false }
-      html += `<h5>${inline(line.replace(/^#####\s/, ''))}</h5>\n`
+      const raw = line.replace(/^#####\s/, '')
+      const t = inline(raw)
+      html += `<h5 id="${headingId(stripInline(t))}">${t}</h5>\n`
     } else if (/^####\s/.test(line)) {
       if (inList) { html += '</ul>\n'; inList = false }
-      html += `<h4>${inline(line.replace(/^####\s/, ''))}</h4>\n`
+      const raw = line.replace(/^####\s/, '')
+      const t = inline(raw)
+      html += `<h4 id="${headingId(stripInline(t))}">${t}</h4>\n`
     } else if (/^###\s/.test(line)) {
       if (inList) { html += '</ul>\n'; inList = false }
-      html += `<h3>${inline(line.replace(/^###\s/, ''))}</h3>\n`
+      const raw = line.replace(/^###\s/, '')
+      const t = inline(raw)
+      html += `<h3 id="${headingId(stripInline(t))}">${t}</h3>\n`
     } else if (/^##\s/.test(line)) {
       if (inList) { html += '</ul>\n'; inList = false }
-      html += `<h2>${inline(line.replace(/^##\s/, ''))}</h2>\n`
+      const raw = line.replace(/^##\s/, '')
+      const t = inline(raw)
+      html += `<h2 id="${headingId(stripInline(t))}">${t}</h2>\n`
     } else if (/^#\s/.test(line)) {
       if (inList) { html += '</ul>\n'; inList = false }
-      html += `<h1>${inline(line.replace(/^#\s/, ''))}</h1>\n`
+      const raw = line.replace(/^#\s/, '')
+      const t = inline(raw)
+      html += `<h1 id="${headingId(stripInline(t))}">${t}</h1>\n`
     } else if (/^>\s/.test(line)) {
       if (inList) { html += '</ul>\n'; inList = false }
       html += `<blockquote>${inline(line.replace(/^>\s/, ''))}</blockquote>\n`
@@ -128,6 +165,42 @@ function renderMarkdown(md: string): string {
   if (inCode) html += `<pre class="code-block"><code class="language-${codeLang || 'text'}">${codeBuffer.join('\n').replace(/</g, '&lt;')}</code></pre>\n`
   // 用 DOMPurify 过滤 XSS：移除 javascript: 协议链接、事件处理器等危险内容
   return DOMPurify.sanitize(html, { ADD_ATTR: ['target', 'rel'] })
+}
+
+/** 从 markdown 内容提取标题，用于生成 TOC */
+function extractToc(md: string): Array<{ level: number; text: string; id: string }> {
+  const slugCounter = new Map<string, number>()
+  function headingId(text: string): string {
+    const base = text
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s-]/gu, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      || 'section'
+    const n = (slugCounter.get(base) || 0) + 1
+    slugCounter.set(base, n)
+    return n === 1 ? base : `${base}-${n}`
+  }
+  const toc: Array<{ level: number; text: string; id: string }> = []
+  const lines = md.split('\n')
+  let inCode = false
+  for (const line of lines) {
+    if (line.trim().startsWith('```')) { inCode = !inCode; continue }
+    if (inCode) continue
+    const m = /^(#{1,5})\s+(.*)$/.exec(line)
+    if (m) {
+      const level = m[1].length
+      // 去除行内 markdown 标记
+      const text = m[2]
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/\*([^*]+)\*/g, '$1')
+        .replace(/`([^`]+)`/g, '$1')
+        .trim()
+      toc.push({ level, text, id: headingId(text) })
+    }
+  }
+  return toc
 }
 
 function formatRelative(dateStr: string): string {
@@ -168,6 +241,7 @@ export default function PostDetail() {
   const [post, setPost] = useState<Post | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [toc, setToc] = useState<Array<{ level: number; text: string; id: string }>>([])
 
   const [comments, setComments] = useState<Comment[]>([])
   const [commentText, setCommentText] = useState('')
@@ -176,6 +250,12 @@ export default function PostDetail() {
   const [commentError, setCommentError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [commentLikeBusy, setCommentLikeBusy] = useState<Record<number, boolean>>({})
+  const [visibleComments, setVisibleComments] = useState(10)
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null)
+  const [editText, setEditText] = useState('')
+  const [editBusy, setEditBusy] = useState(false)
+
+  const { recordVisit, updateProgress } = useReadingHistory()
 
   const [likeCount, setLikeCount] = useState(0)
   const [liked, setLiked] = useState(false)
@@ -208,7 +288,15 @@ export default function PostDetail() {
     getPost(slug)
       .then((data) => {
         setPost(data)
+        setToc(extractToc(data.content))
         setLoading(false)
+        recordVisit({
+          slug: data.slug,
+          title: data.title,
+          excerpt: data.excerpt,
+          cover_image: data.cover_image,
+          author_username: data.author_username ?? undefined,
+        })
       })
       .catch((err) => {
         setError(err.message)
@@ -251,6 +339,13 @@ export default function PostDetail() {
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  // 防抖地把阅读进度同步到本地历史，便于"继续阅读"
+  useEffect(() => {
+    if (!slug || readProgress === 0) return
+    const t = setTimeout(() => updateProgress(slug, Math.round(readProgress)), 800)
+    return () => clearTimeout(t)
+  }, [slug, readProgress, updateProgress])
 
   useEffect(() => {
     loadPost()
@@ -530,6 +625,22 @@ export default function PostDetail() {
     }
   }
 
+  async function handleSaveEdit(id: number) {
+    const text = editText.trim()
+    if (!text) return
+    setEditBusy(true)
+    try {
+      const updated = await editComment(id, text)
+      setComments((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)))
+      setEditingCommentId(null)
+      setEditText('')
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '编辑失败')
+    } finally {
+      setEditBusy(false)
+    }
+  }
+
   async function handleToggleCommentLike(commentId: number) {
     if (!user) {
       navigate('/login?redirect=' + encodeURIComponent(`/post/${slug}`))
@@ -613,6 +724,8 @@ export default function PostDetail() {
   function renderComment(c: Comment) {
     const isMine = user && c.user_id === user.id
     const canDel = isMine || user?.role === 'admin'
+    const canEdit = isMine || user?.role === 'admin'
+    const isEditing = editingCommentId === c.id
     const kids = repliesOf(c.id)
     const cLiked = !!c.liked
     const cLikesCount = c.likes_count ?? 0
@@ -621,7 +734,7 @@ export default function PostDetail() {
       <li key={c.id} className="comment">
         <Link to={`/${c.author_username}`} className="comment__avatar">
           {c.author_avatar ? (
-            <img src={c.author_avatar} alt={c.author_username} />
+            <img src={c.author_avatar} alt={c.author_username} loading="lazy" />
           ) : (
             <span className="comment__avatar-fallback">
               {c.author_username.charAt(0).toUpperCase()}
@@ -634,9 +747,42 @@ export default function PostDetail() {
               <Link to={`/${c.author_username}`} className="comment__author">
                 @{c.author_username}
               </Link>
-              <span className="comment__time">{formatRelative(c.created_at)}</span>
+              <span className="comment__time">
+                {formatRelative(c.created_at)}
+                {c.updated_at && <span className="comment__edited">（已编辑）</span>}
+              </span>
             </div>
-            <p className="comment__content">{renderCommentContent(c.content)}</p>
+            {isEditing ? (
+              <div className="comment__edit">
+                <textarea
+                  rows={3}
+                  className="comment__edit-textarea"
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  disabled={editBusy}
+                />
+                <div className="reply-box__actions">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => { setEditingCommentId(null); setEditText('') }}
+                    disabled={editBusy}
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => handleSaveEdit(c.id)}
+                    disabled={!editText.trim() || editBusy}
+                  >
+                    保存
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="comment__content">{renderCommentContent(c.content)}</p>
+            )}
           </div>
           <div className="comment__actions">
             <button
@@ -659,6 +805,18 @@ export default function PostDetail() {
                 }}
               >
                 回复
+              </button>
+            )}
+            {canEdit && !isEditing && (
+              <button
+                type="button"
+                className="comment__action"
+                onClick={() => {
+                  setEditingCommentId(c.id)
+                  setEditText(c.content)
+                }}
+              >
+                编辑
               </button>
             )}
             {canDel && (
@@ -718,7 +876,9 @@ export default function PostDetail() {
     )}
     <div className="post-layout">
       <PostSidebar post={post} />
-      <article className="article">
+      <div className="post-main">
+        <TableOfContents items={toc} />
+        <article className="article">
         <SEO
           title={post.title}
           description={post.excerpt || post.content.slice(0, 150)}
@@ -738,7 +898,7 @@ export default function PostDetail() {
             <span className="article__author">
               {authorAvatar && (
                 <span className="article__author-avatar">
-                  <img src={authorAvatar} alt={author} />
+                  <img src={authorAvatar} alt={author} loading="lazy" />
                 </span>
               )}
               @{author}
@@ -761,7 +921,7 @@ export default function PostDetail() {
 
         {post.cover_image && (
           <div className="article__cover">
-            <img src={post.cover_image} alt={post.title} />
+            <img src={post.cover_image} alt={post.title} loading="lazy" width={1200} height={630} />
           </div>
         )}
 
@@ -870,7 +1030,7 @@ export default function PostDetail() {
                       }}
                     >
                       {u.avatar ? (
-                        <img src={u.avatar} alt="" className="mention-dropdown__avatar" />
+                        <img src={u.avatar} alt="" className="mention-dropdown__avatar" loading="lazy" width={32} height={32} />
                       ) : (
                         <span className="mention-dropdown__avatar-fallback">{u.username.charAt(0).toUpperCase()}</span>
                       )}
@@ -905,10 +1065,24 @@ export default function PostDetail() {
           {comments.length === 0 ? (
             <p className="comments__empty">还没有评论，成为第一个发言的人。</p>
           ) : (
-            <ul className="comment-list">{topLevel.map(renderComment)}</ul>
+            <>
+              <ul className="comment-list">{topLevel.slice(0, visibleComments).map(renderComment)}</ul>
+              {topLevel.length > visibleComments && (
+                <div className="comments__load-more">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setVisibleComments((v) => v + 10)}
+                  >
+                    加载更多评论（剩余 {topLevel.length - visibleComments} 条）
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </section>
       </article>
+      </div>
     </div>
     </>
   )

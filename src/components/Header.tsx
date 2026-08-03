@@ -84,6 +84,9 @@ export default function Header() {
           <NavLink to="/" className="nav__link" end>
             {t('nav.forum')}
           </NavLink>
+          <NavLink to="/history" className="nav__link">
+            {t('nav.history')}
+          </NavLink>
           {user && (
             <NavLink to="/favorites" className="nav__link">
               {t('nav.favorites')}
