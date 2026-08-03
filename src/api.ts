@@ -19,8 +19,11 @@ export interface LoginResult {
   message?: string;
 }
 
+const API_BASE: string = (import.meta.env.VITE_API_BASE as string) || ''
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
+  const fullUrl = API_BASE + url
+  const res = await fetch(fullUrl, {
     headers: { 'Content-Type': 'application/json' },
     credentials: 'same-origin',
     ...options,
