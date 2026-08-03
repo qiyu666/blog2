@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { PostInput } from '../types'
 import MarkdownEditor from './MarkdownEditor'
+import CoverUploader from './CoverUploader'
 
 interface Props {
   initial?: Partial<PostInput>
@@ -150,7 +151,6 @@ export default function PostForm({
   const [showDraftBanner, setShowDraftBanner] = useState(false)
   const [savedHintVisible, setSavedHintVisible] = useState(false)
   const [tagInput, setTagInput] = useState('')
-  const [coverPreviewError, setCoverPreviewError] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -301,7 +301,6 @@ export default function PostForm({
   }
 
   const isNewMode = mode === 'new'
-  const hasCover = form.cover_image.trim() && !coverPreviewError
 
   return (
     <form
@@ -416,25 +415,17 @@ export default function PostForm({
       {/* Cover image */}
       <div className="editor-form__section">
         <label className="editor-form__section-label">封面图</label>
-        <div className="cover-input">
+        <CoverUploader
+          value={form.cover_image}
+          onChange={(url) => update('cover_image', url)}
+        />
+        <div className="cover-input__url-row">
           <input
             className="cover-input__url"
             value={form.cover_image}
-            onChange={(e) => {
-              update('cover_image', e.target.value)
-              setCoverPreviewError(false)
-            }}
-            placeholder="https://images.unsplash.com/..."
+            onChange={(e) => update('cover_image', e.target.value)}
+            placeholder="或直接粘贴图片 URL"
           />
-          {hasCover && (
-            <div className="cover-input__preview">
-              <img
-                src={form.cover_image}
-                alt="封面预览"
-                onError={() => setCoverPreviewError(true)}
-              />
-            </div>
-          )}
         </div>
       </div>
 
