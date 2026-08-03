@@ -3,23 +3,29 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import PostForm from '../components/PostForm'
 import { getPost, updatePost } from '../api'
 import type { Post, PostInput } from '../types'
+import { useAuth } from '../auth/AuthContext'
 
 export default function EditPost() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [post, setPost] = useState<Post | null>(null)
   const [loading, setLoading] = useState(true)
+  const [forbidden, setForbidden] = useState(false)
 
   useEffect(() => {
     if (!id) return
-    // 通过单帖 API 加载，获取完整的 post 数据（包含 custom_js）
     getPost(id)
       .then((data) => {
         setPost(data)
         setLoading(false)
+        // 权限检查：作者或管理员才能编辑
+        if (user && user.role !== 'admin' && data.author_id !== user.id) {
+          setForbidden(true)
+        }
       })
       .catch(() => setLoading(false))
-  }, [id])
+  }, [id, user])
 
   async function handleSubmit(data: PostInput) {
     if (!post) return
@@ -28,6 +34,15 @@ export default function EditPost() {
   }
 
   if (loading) return <div className="loading">加载中</div>
+  if (forbidden) return (
+    <div className="error-state">
+      <h2 className="error-state__title">无权编辑</h2>
+      <p className="error-state__msg">你不是这篇文章的作者，无法进行编辑。</p>
+      <p>
+        <Link to="/" style={{ color: 'var(--accent)' }}>← 返回首页</Link>
+      </p>
+    </div>
+  )
   if (!post) return (
     <div className="error-state">
       <h2 className="error-state__title">未找到帖子</h2>

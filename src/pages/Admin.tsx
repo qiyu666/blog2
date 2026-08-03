@@ -12,12 +12,17 @@ import {
   getBugs,
   batchPostAction,
   getAnalytics,
+  getAdminCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
   type AnalyticsData,
   type AdminUser,
   type AdminPost,
   type AdminComment,
   type AdminReport,
   type BugReportItem,
+  type AdminCategory,
 } from '../api'
 import { useAuth } from '../auth/AuthContext'
 
@@ -80,10 +85,22 @@ export default function Admin() {
   const [reports, setReports] = useState<AdminReport[]>([])
   const [bugs, setBugs] = useState<BugReportItem[]>([])
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
+  const [categories, setCategories] = useState<AdminCategory[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [postStatus, setPostStatus] = useState<'all' | 'published' | 'draft'>('all')
+
+  // 分类对话框状态
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<AdminCategory | null>(null)
+  const [categoryForm, setCategoryForm] = useState({
+    name: '',
+    slug: '',
+    description: '',
+    icon: '📂',
+    sort_order: 0,
+  })
 
   async function load(tab: Tab) {
     setLoading(true)
@@ -91,7 +108,12 @@ export default function Admin() {
     setQuery('')
     try {
       if (tab === 'users') setUsers(await getAdminUsers())
-      else if (tab === 'posts' || tab === 'categories' || tab === 'tags') setPosts(await getAdminPosts())
+      else if (tab === 'posts' || tab === 'tags') setPosts(await getAdminPosts())
+      else if (tab === 'categories') {
+        const [p, c] = await Promise.all([getAdminPosts(), getAdminCategories()])
+        setPosts(p)
+        setCategories(c)
+      }
       else if (tab === 'comments') setComments(await getAdminComments())
       else if (tab === 'bugs') setBugs(await getBugs())
       else if (tab === 'reports') setReports(await getAdminReports())
@@ -237,6 +259,68 @@ export default function Admin() {
     }
   }
 
+  // ===== 分类管理操作 =====
+  function openCreateCategory() {
+    setEditingCategory(null)
+    setCategoryForm({ name: '', slug: '', description: '', icon: '📂', sort_order: 0 })
+    setCategoryModalOpen(true)
+  }
+
+  function openEditCategory(cat: AdminCategory) {
+    setEditingCategory(cat)
+    setCategoryForm({
+      name: cat.name,
+      slug: cat.slug,
+      description: cat.description || '',
+      icon: cat.icon || '📂',
+      sort_order: cat.sort_order || 0,
+    })
+    setCategoryModalOpen(true)
+  }
+
+  function closeCategoryModal() {
+    setCategoryModalOpen(false)
+    setEditingCategory(null)
+  }
+
+  async function handleCategorySubmit() {
+    if (!categoryForm.name.trim()) {
+      alert('请输入分类名称')
+      return
+    }
+    try {
+      if (editingCategory) {
+        const updated = await updateCategory(editingCategory.id, categoryForm)
+        setCategories((prev) => prev.map((c) => (c.id === updated.id ? updated : c)))
+        // 刷新帖子以更新 categoryStats
+        setPosts(await getAdminPosts())
+      } else {
+        const created = await createCategory(categoryForm)
+        setCategories((prev) => [...prev, created])
+      }
+      closeCategoryModal()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '操作失败')
+    }
+  }
+
+  async function handleDeleteCategory(cat: AdminCategory) {
+    if (cat.count > 0) {
+      if (!confirm(`分类「${cat.name}」下有 ${cat.count} 篇文章，删除后这些文章的分类将变为「General」。确认删除？`)) return
+    } else {
+      if (!confirm(`确认删除分类「${cat.name}」？`)) return
+    }
+    try {
+      const res = await deleteCategory(cat.id)
+      setCategories((prev) => prev.filter((c) => c.id !== cat.id))
+      // 刷新帖子以更新 categoryStats
+      setPosts(await getAdminPosts())
+      alert(`已删除分类「${res.name}」`)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '删除失败')
+    }
+  }
+
   // 统计数据
   const stats = useMemo(() => {
     const adminCount = users.filter((u) => u.role === 'admin').length
@@ -275,8 +359,19 @@ export default function Admin() {
     }
   }, [users, posts, comments, reports, bugs])
 
-  // 分类统计
+  // 分类统计（优先使用后端独立表数据，若为空则回退到从帖子中统计）
   const categoryStats = useMemo(() => {
+    if (categories.length > 0) {
+      return categories.map((c) => ({
+        id: c.id,
+        name: c.name,
+        count: c.count,
+        slug: c.slug,
+        description: c.description,
+        icon: c.icon,
+        sort_order: c.sort_order,
+      }))
+    }
     const map = new Map<string, number>()
     posts.forEach((p) => {
       const cats = p.category?.split('/').map((c) => c.trim()) || []
@@ -285,9 +380,15 @@ export default function Admin() {
       })
     })
     return Array.from(map.entries())
-      .map(([name, count]) => ({ name, count }))
+      .map(([name, count]) => ({ name, count, id: 0, slug: '', description: '', icon: '📂', sort_order: 0 }))
       .sort((a, b) => b.count - a.count)
-  }, [posts])
+  }, [posts, categories])
+
+  const filteredCategories = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return categoryStats
+    return categoryStats.filter((c) => c.name.toLowerCase().includes(q))
+  }, [categoryStats, query])
 
   // 标签统计
   const tagStats = useMemo(() => {
@@ -366,12 +467,6 @@ export default function Admin() {
         b.status.toLowerCase().includes(q),
     )
   }, [bugs, query])
-
-  const filteredCategories = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return categoryStats
-    return categoryStats.filter((c) => c.name.toLowerCase().includes(q))
-  }, [categoryStats, query])
 
   const filteredTags = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -565,7 +660,7 @@ export default function Admin() {
               <button
                 type="button"
                 className="admin-btn admin-btn--primary"
-                onClick={() => alert('分类创建功能开发中')}
+                onClick={openCreateCategory}
               >
                 <span>＋</span> 新建分类
               </button>
@@ -619,6 +714,8 @@ export default function Admin() {
               error={error}
               query={query}
               setQuery={setQuery}
+              onEdit={openEditCategory}
+              onDelete={handleDeleteCategory}
             />
           )}
 
@@ -684,6 +781,79 @@ export default function Admin() {
           )}
         </div>
       </main>
+
+      {/* 分类编辑对话框 */}
+      {categoryModalOpen && (
+        <div className="modal-overlay" onClick={closeCategoryModal}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal__header">
+              <h3 className="modal__title">{editingCategory ? '编辑分类' : '新建分类'}</h3>
+              <button type="button" className="modal__close" onClick={closeCategoryModal}>×</button>
+            </div>
+            <div className="modal__body">
+              <div className="form-field">
+                <label className="form-field__label">分类名称 *</label>
+                <input
+                  type="text"
+                  className="form-field__input"
+                  placeholder="例如：技术、生活、随笔"
+                  value={categoryForm.name}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                />
+              </div>
+              <div className="form-field">
+                <label className="form-field__label">Slug（URL友好标识，留空自动生成）</label>
+                <input
+                  type="text"
+                  className="form-field__input"
+                  placeholder="例如：tech"
+                  value={categoryForm.slug}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, slug: e.target.value })}
+                />
+              </div>
+              <div className="form-field">
+                <label className="form-field__label">分类图标（Emoji）</label>
+                <input
+                  type="text"
+                  className="form-field__input"
+                  placeholder="📂"
+                  value={categoryForm.icon}
+                  maxLength={10}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, icon: e.target.value })}
+                />
+              </div>
+              <div className="form-field">
+                <label className="form-field__label">排序（数字越小越靠前）</label>
+                <input
+                  type="number"
+                  className="form-field__input"
+                  placeholder="0"
+                  value={categoryForm.sort_order}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, sort_order: Number(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="form-field">
+                <label className="form-field__label">分类描述</label>
+                <textarea
+                  className="form-field__input"
+                  rows={3}
+                  placeholder="简要描述这个分类的内容..."
+                  value={categoryForm.description}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="modal__footer">
+              <button type="button" className="admin-btn admin-btn--ghost" onClick={closeCategoryModal}>
+                取消
+              </button>
+              <button type="button" className="admin-btn admin-btn--primary" onClick={handleCategorySubmit}>
+                {editingCategory ? '保存修改' : '创建分类'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1328,6 +1498,16 @@ function PostsView({
 }
 
 // ===== 分类管理 =====
+type CategoryItem = {
+  id?: number
+  name: string
+  count: number
+  slug?: string
+  description?: string
+  icon?: string
+  sort_order?: number
+}
+
 function CategoriesView({
   categories,
   totalCategories,
@@ -1335,13 +1515,17 @@ function CategoriesView({
   error,
   query,
   setQuery,
+  onEdit,
+  onDelete,
 }: {
-  categories: { name: string; count: number }[]
+  categories: CategoryItem[]
   totalCategories: number
   loading: boolean
   error: string
   query: string
   setQuery: (q: string) => void
+  onEdit: (cat: CategoryItem & AdminCategory) => void
+  onDelete: (cat: CategoryItem & AdminCategory) => void
 }) {
   return (
     <div className="admin-list-view">
@@ -1361,15 +1545,32 @@ function CategoriesView({
       ) : (
         <div className="category-grid">
           {categories.map((c, i) => (
-            <div key={i} className="category-card">
-              <div className="category-card__icon">📂</div>
+            <div key={c.id || i} className="category-card">
+              <div className="category-card__icon">{c.icon || '📂'}</div>
               <div className="category-card__body">
                 <div className="category-card__name">{c.name}</div>
                 <div className="category-card__count">{c.count} 篇文章</div>
+                {c.description && (
+                  <div className="category-card__desc" title={c.description}>
+                    {c.description.length > 40 ? c.description.slice(0, 40) + '...' : c.description}
+                  </div>
+                )}
               </div>
               <div className="category-card__actions">
-                <button type="button" className="admin-btn admin-btn--sm">编辑</button>
-                <button type="button" className="admin-btn admin-btn--sm admin-btn--danger-outline">
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--sm"
+                  disabled={!c.id}
+                  onClick={() => c.id && onEdit(c as AdminCategory)}
+                >
+                  编辑
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--sm admin-btn--danger-outline"
+                  disabled={!c.id}
+                  onClick={() => c.id && onDelete(c as AdminCategory)}
+                >
                   删除
                 </button>
               </div>

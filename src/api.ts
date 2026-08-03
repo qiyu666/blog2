@@ -702,3 +702,55 @@ export async function batchPostAction(
     body: JSON.stringify({ action, ids }),
   });
 }
+
+// ===== 分类管理 =====
+export interface AdminCategory {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  icon: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  count: number;
+}
+
+export async function getAdminCategories(): Promise<AdminCategory[]> {
+  return request<AdminCategory[]>('/api/admin/categories');
+}
+
+export async function createCategory(data: {
+  name: string;
+  slug?: string;
+  description?: string;
+  icon?: string;
+  sort_order?: number;
+}): Promise<AdminCategory> {
+  return request<AdminCategory>('/api/admin/categories', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateCategory(
+  id: number,
+  data: Partial<{
+    name: string;
+    slug: string;
+    description: string;
+    icon: string;
+    sort_order: number;
+  }>
+): Promise<AdminCategory> {
+  return request<AdminCategory>(`/api/admin/categories?id=${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteCategory(id: number): Promise<{ success: boolean; id: number; name: string }> {
+  return request(`/api/admin/categories?id=${id}`, {
+    method: 'DELETE',
+  });
+}
