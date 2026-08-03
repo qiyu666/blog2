@@ -716,6 +716,18 @@ export interface AdminCategory {
   count: number;
 }
 
+export interface PublicCategory {
+  id: number;
+  name: string;
+  slug: string;
+  icon: string;
+  count: number;
+}
+
+export async function getCategories(): Promise<PublicCategory[]> {
+  return request<PublicCategory[]>('/api/categories');
+}
+
 export async function getAdminCategories(): Promise<AdminCategory[]> {
   return request<AdminCategory[]>('/api/admin/categories');
 }

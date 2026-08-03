@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { PostInput } from '../types'
+import { getCategories, type PublicCategory } from '../api'
 import MarkdownEditor from './MarkdownEditor'
 import CoverUploader from './CoverUploader'
 
@@ -16,7 +17,7 @@ interface Props {
   editingId?: number
 }
 
-const CATEGORIES = ['随笔', '技术', '文化', '摄影', '综合']
+const FALLBACK_CATEGORIES = ['随笔', '技术', '文化', '摄影', '综合']
 
 // 预设自定义脚本示例
 const PRESET_BG_GRADIENT = `// 渐变背景动画 — 为文章添加流动的渐变背景
@@ -152,6 +153,30 @@ export default function PostForm({
   const [savedHintVisible, setSavedHintVisible] = useState(false)
   const [tagInput, setTagInput] = useState('')
   const [showSettings, setShowSettings] = useState(false)
+  const [categories, setCategories] = useState<PublicCategory[]>([])
+
+  // 加载分类列表
+  useEffect(() => {
+    getCategories()
+      .then((data) => {
+        if (data && data.length > 0) {
+          setCategories(data)
+        }
+      })
+      .catch(() => {
+        // 静默失败，使用回退列表
+      })
+  }, [])
+
+  // 确保当前分类在选项列表中（编辑模式下可能有历史分类）
+  const displayCategories = useMemo(() => {
+    if (categories.length === 0) return []
+    const names = new Set(categories.map((c) => c.name))
+    if (form.category && !names.has(form.category)) {
+      return [...categories, { id: 0, name: form.category, slug: '', icon: '📂', count: 0 }]
+    }
+    return categories
+  }, [categories, form.category])
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -377,11 +402,17 @@ export default function PostForm({
             value={form.category}
             onChange={(e) => update('category', e.target.value)}
           >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
+            {displayCategories.length > 0
+              ? displayCategories.map((c) => (
+                  <option key={c.id || c.name} value={c.name}>
+                    {c.icon} {c.name}
+                  </option>
+                ))
+              : FALLBACK_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
           </select>
         </div>
         <div className="editor-form__meta-item editor-form__meta-item--grow">
