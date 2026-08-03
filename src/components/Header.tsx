@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext';
 import SearchBar from './SearchBar';
+import SearchPalette from './SearchPalette';
 import NotificationsMenu from './NotificationsMenu';
 import LanguageSwitcher from './LanguageSwitcher';
 
@@ -41,6 +42,21 @@ export default function Header() {
     return 'light';
   });
   const [scrolled, setScrolled] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Ctrl+K / Cmd+K 快捷键打开搜索面板
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
 
   useEffect(() => {
     const initial = getInitialTheme();
@@ -74,6 +90,8 @@ export default function Header() {
   };
 
   return (
+    <>
+    <SearchPalette open={searchOpen} onClose={closeSearch} />
     <header className={`site-header${scrolled ? ' scrolled' : ''}`}>
       <div className="site-header__inner">
         <Link to="/" className="brand">
@@ -146,5 +164,6 @@ export default function Header() {
         </nav>
       </div>
     </header>
+    </>
   );
 }

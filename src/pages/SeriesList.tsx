@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../auth/AuthContext'
 import { getSeriesList, type Series } from '../api'
 import SEO from '../components/SEO'
 
 export default function SeriesList() {
+  const { user } = useAuth()
   const [series, setSeries] = useState<Series[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -23,7 +25,12 @@ export default function SeriesList() {
       <SEO title="合集" description="文章系列与专栏" />
       <div className="section-header">
         <h1 className="section-header__title">合集 / 专栏</h1>
-        <span className="section-header__count">{series.length} 个</span>
+        <div className="section-header__actions">
+          <span className="section-header__count">{series.length} 个</span>
+          {user && (
+            <Link to="/series/manage" className="btn-secondary">管理合集</Link>
+          )}
+        </div>
       </div>
 
       {series.length === 0 ? (

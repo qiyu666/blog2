@@ -34,6 +34,7 @@ const TagPage = lazy(() => import('./pages/Tag'))
 const History = lazy(() => import('./pages/History'))
 const SeriesList = lazy(() => import('./pages/SeriesList'))
 const SeriesDetail = lazy(() => import('./pages/SeriesDetail'))
+const SeriesManage = lazy(() => import('./pages/SeriesManage'))
 const Links = lazy(() => import('./pages/Links'))
 const Unsubscribe = lazy(() => import('./pages/Unsubscribe'))
 
@@ -52,6 +53,14 @@ export default function App() {
           <Route path="/history" element={<History />} />
           <Route path="/series" element={<SeriesList />} />
           <Route path="/series/:slug" element={<SeriesDetail />} />
+          <Route
+            path="/series/manage"
+            element={
+              <ProtectedRoute>
+                <SeriesManage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/links" element={<Links />} />
           <Route path="/unsubscribe" element={<Unsubscribe />} />
           <Route
