@@ -126,30 +126,127 @@ export async function onRequestGet(context: {
     // 未登录：忽略 bind 标记，走正常登录/注册流程
   }
 
+  // 查找现有用户：优先通过 social_github 绑定，其次通过 username/email
   let userId: number
   try {
-    const existingByUsername = await env.DB
-      .prepare('SELECT id, password_hash FROM users WHERE username = ?')
-      .bind(githubUser.login)
-      .first<{ id: number; password_hash: string }>()
+    // 1. 先检查是否已绑定 GitHub（即使 username 冲突也能识别）
+    let existingByGithub: { id: number; password_hash: string } | null = null
+    try {
+      existingByGithub = await env.DB
+        .prepare('SELECT id, password_hash FROM users WHERE social_github = ?')
+        .bind(githubUser.login)
+        .first<{ id: number; password_hash: string }>()
+    } catch {
+      // social_github 列可能不存在
+    }
 
-    if (existingByUsername) {
-      if (existingByUsername.password_hash && existingByUsername.password_hash !== '') {
-        // 用户名冲突：本地密码账号占用了该用户名，不复用此账号
-        // 改为创建新用户，用户名为 githubUser.login + '_gh'，若冲突再追加数字
-        let baseName = `${githubUser.login}_gh`
-        let candidateName = baseName
-        let suffix = 2
-        // 确保新用户名唯一
-        while (true) {
-          const clash = await env.DB
-            .prepare('SELECT id FROM users WHERE username = ?')
-            .bind(candidateName)
-            .first()
-          if (!clash) break
-          candidateName = `${baseName}${suffix++}`
+    // 额外检查：是否存在遗留的 _gh 后缀用户（之前 bug 导致创建的孤儿账号）
+    if (!existingByGithub) {
+      try {
+        const ghUser = await env.DB
+          .prepare('SELECT id, password_hash FROM users WHERE username = ?')
+          .bind(`${githubUser.login}_gh`)
+          .first<{ id: number; password_hash: string }>()
+        if (ghUser) {
+          existingByGithub = ghUser
+          // 修复 social_github 绑定
+          try {
+            await env.DB
+              .prepare('UPDATE users SET social_github = ? WHERE id = ? AND (social_github IS NULL OR social_github = \'\')')
+              .bind(githubUser.login, ghUser.id)
+              .run()
+          } catch {}
         }
+      } catch {}
+    }
 
+    // 如果已绑定 GitHub，直接登录（无论是否有密码）
+    if (existingByGithub) {
+      userId = existingByGithub.id
+      // 更新头像和显示名（如果为空）
+      if (githubUser.avatar_url) {
+        try {
+          await env.DB
+            .prepare('UPDATE users SET avatar = ? WHERE id = ? AND (avatar IS NULL OR avatar = \'\')')
+            .bind(githubUser.avatar_url, userId)
+            .run()
+        } catch {
+          // ignore
+        }
+      }
+      if (githubUser.name) {
+        try {
+          await env.DB
+            .prepare('UPDATE users SET display_name = ? WHERE id = ? AND (display_name IS NULL OR display_name = \'\')')
+            .bind(githubUser.name, userId)
+            .run()
+        } catch {
+          // ignore
+        }
+      }
+    } else {
+      // 2. 未绑定：检查 username 是否被占用
+      const existingByUsername = await env.DB
+        .prepare('SELECT id, password_hash FROM users WHERE username = ?')
+        .bind(githubUser.login)
+        .first<{ id: number; password_hash: string }>()
+
+      if (existingByUsername) {
+        if (existingByUsername.password_hash && existingByUsername.password_hash !== '') {
+          // 用户名冲突：本地密码账号占用了该用户名
+          // 创建新用户，用户名为 githubUser.login + '_gh'
+          let baseName = `${githubUser.login}_gh`
+          let candidateName = baseName
+          let suffix = 2
+          while (true) {
+            const clash = await env.DB
+              .prepare('SELECT id FROM users WHERE username = ?')
+              .bind(candidateName)
+              .first()
+            if (!clash) break
+            candidateName = `${baseName}${suffix++}`
+          }
+
+          const existingByEmail = await env.DB
+            .prepare('SELECT id FROM users WHERE email = ?')
+            .bind(primaryEmail)
+            .first<{ id: number }>()
+
+          let emailToUse = primaryEmail
+          if (existingByEmail) {
+            emailToUse = `${githubUser.login}_${Date.now()}@users.noreply.github.com`
+          }
+
+          const avatar = githubUser.avatar_url || ''
+          const displayName = githubUser.name || githubUser.login
+          const bio = githubUser.bio || ''
+
+          const result = await env.DB
+            .prepare(
+              `INSERT INTO users (username, email, display_name, avatar, bio, password_hash, salt, role, social_github)
+               VALUES (?, ?, ?, ?, ?, '', '', 'member', ?)`
+            )
+            .bind(candidateName, emailToUse, displayName, avatar, bio, githubUser.login)
+            .run()
+
+          userId = Number(result.meta?.last_row_id || 0)
+          if (!userId) {
+            return redirectWithError('无法创建新用户')
+          }
+        } else {
+          // 空密码账号：老用户，绑定 social_github 并登录
+          userId = existingByUsername.id
+          try {
+            await env.DB
+              .prepare('UPDATE users SET social_github = ? WHERE id = ? AND (social_github IS NULL OR social_github = \'\')')
+              .bind(githubUser.login, userId)
+              .run()
+          } catch {
+            // social_github 列不存在时静默跳过
+          }
+        }
+      } else {
+        // 3. 用户名未占用：检查邮箱是否已被其他账号使用
         const existingByEmail = await env.DB
           .prepare('SELECT id FROM users WHERE email = ?')
           .bind(primaryEmail)
@@ -169,51 +266,13 @@ export async function onRequestGet(context: {
             `INSERT INTO users (username, email, display_name, avatar, bio, password_hash, salt, role, social_github)
              VALUES (?, ?, ?, ?, ?, '', '', 'member', ?)`
           )
-          .bind(candidateName, emailToUse, displayName, avatar, bio, githubUser.login)
+          .bind(githubUser.login, emailToUse, displayName, avatar, bio, githubUser.login)
           .run()
 
-        userId = Number(result.lastInsertRowId || 0)
+        userId = Number(result.meta?.last_row_id || 0)
         if (!userId) {
-          return redirectWithError('无法获取新用户 ID')
+          return redirectWithError('无法创建新用户')
         }
-      } else {
-        // OAuth 账号：当作老用户登录，如果 social_github 为空则自动填充
-        userId = existingByUsername.id
-        try {
-          await env.DB
-            .prepare('UPDATE users SET social_github = ? WHERE id = ? AND (social_github IS NULL OR social_github = \'\')')
-            .bind(githubUser.login, userId)
-            .run()
-        } catch {
-          // social_github 列不存在时静默跳过
-        }
-      }
-    } else {
-      const existingByEmail = await env.DB
-        .prepare('SELECT id FROM users WHERE email = ?')
-        .bind(primaryEmail)
-        .first<{ id: number }>()
-
-      let emailToUse = primaryEmail
-      if (existingByEmail) {
-        emailToUse = `${githubUser.login}_${Date.now()}@users.noreply.github.com`
-      }
-
-      const avatar = githubUser.avatar_url || ''
-      const displayName = githubUser.name || githubUser.login
-      const bio = githubUser.bio || ''
-
-      const result = await env.DB
-        .prepare(
-          `INSERT INTO users (username, email, display_name, avatar, bio, password_hash, salt, role, social_github)
-           VALUES (?, ?, ?, ?, ?, '', '', 'member', ?)`
-        )
-        .bind(githubUser.login, emailToUse, displayName, avatar, bio, githubUser.login)
-        .run()
-
-      userId = Number(result.lastInsertRowId || 0)
-      if (!userId) {
-        return redirectWithError('无法获取新用户 ID')
       }
     }
   } catch (err) {
