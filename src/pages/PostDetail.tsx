@@ -955,7 +955,6 @@ export default function PostDetail() {
     <div className="post-layout">
       <PostSidebar post={post} />
       <div className="post-main">
-        <TableOfContents items={toc} />
         <article className="article">
         <SEO
           title={post.title}
@@ -1218,6 +1217,11 @@ export default function PostDetail() {
         </section>
       </article>
       </div>
+      {toc.length >= 2 && (
+        <aside className="post-toc" aria-label="文章目录">
+          <TableOfContents items={toc} />
+        </aside>
+      )}
     </div>
     </>
   )
