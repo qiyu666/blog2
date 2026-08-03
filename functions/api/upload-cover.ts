@@ -7,7 +7,7 @@ import { enforceWriteRateLimit } from './_rate-limit'
 
 const IMGBB_UPLOAD_URL = 'https://api.imgbb.com/1/upload'
 
-export const onRequestPost: PagesFunction<{ DB: D1Database; IMGBB_API_KEY: string }> = async (context) => {
+export const onRequestPost: PagesFunction<{ DB: D1Database }> = async (context) => {
   const { request, env } = context
 
   // 1. 鉴权：必须登录
