@@ -1,8 +1,30 @@
+import { useState, FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { subscribe } from '../api'
 
 export default function Footer() {
   const { t } = useTranslation()
   const year = new Date().getFullYear()
+  const [email, setEmail] = useState('')
+  const [status, setStatus] = useState<'idle' | 'busy' | 'ok' | 'err'>('idle')
+  const [msg, setMsg] = useState('')
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (status === 'busy') return
+    setStatus('busy')
+    setMsg('')
+    try {
+      const res = await subscribe(email)
+      setStatus('ok')
+      setMsg(res.message || '订阅成功')
+      setEmail('')
+    } catch (err) {
+      setStatus('err')
+      setMsg(err instanceof Error ? err.message : '订阅失败')
+    }
+  }
+
   return (
     <footer className="site-footer">
       <div className="site-footer__inner">
@@ -15,17 +37,25 @@ export default function Footer() {
           <p className="site-footer__newsletter-desc">
             {t('footer.newsletterDesc')}
           </p>
-          <form className="site-footer__newsletter-form" onSubmit={(e) => e.preventDefault()}>
+          <form className="site-footer__newsletter-form" onSubmit={handleSubmit}>
             <input
               type="email"
               className="site-footer__newsletter-input"
               placeholder={t('footer.newsletterPlaceholder')}
               aria-label={t('footer.newsletterAriaLabel')}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
             />
-            <button type="submit" className="site-footer__newsletter-btn">
-              {t('footer.subscribeBtn')}
+            <button type="submit" className="site-footer__newsletter-btn" disabled={status === 'busy'}>
+              {status === 'busy' ? '订阅中…' : t('footer.subscribeBtn')}
             </button>
           </form>
+          {msg && (
+            <p className={`site-footer__newsletter-msg${status === 'err' ? ' site-footer__newsletter-msg--err' : ''}`}>
+              {msg}
+            </p>
+          )}
         </div>
 
         {/* Main Footer Content */}

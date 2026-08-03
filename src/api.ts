@@ -53,6 +53,16 @@ export async function getPost(slug: string): Promise<Post> {
   return request<Post>(`/api/posts/${slug}`);
 }
 
+export interface PostNeighbor {
+  id: number;
+  title: string;
+  slug: string;
+}
+
+export async function getPostNeighbors(slug: string): Promise<{ previous: PostNeighbor | null; next: PostNeighbor | null }> {
+  return request(`/api/posts/${slug}/neighbors`);
+}
+
 export async function createPost(data: PostInput): Promise<Post> {
   return request<Post>('/api/posts', {
     method: 'POST',
@@ -457,6 +467,106 @@ export async function getPostsByTag(tag: string): Promise<Post[]> {
   return posts.filter((p) =>
     p.tags.split(',').map((t) => t.trim()).includes(tag)
   );
+}
+
+// ===== 合集/专栏 =====
+export interface Series {
+  id: number;
+  slug: string;
+  title: string;
+  description: string;
+  cover_image: string;
+  author_id: number | null;
+  author_username?: string;
+  posts_count?: number;
+  created_at: string;
+}
+
+export interface SeriesPost {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string;
+  category: string;
+  cover_image: string;
+  views: number;
+  created_at: string;
+  sort_order: number;
+  likes_count: number;
+  comments_count: number;
+}
+
+export async function getSeriesList(): Promise<Series[]> {
+  return request<Series[]>('/api/series');
+}
+
+export async function getSeries(slug: string): Promise<{ series: Series; posts: SeriesPost[] }> {
+  return request(`/api/series/${slug}`);
+}
+
+export async function createSeries(data: { title: string; description?: string; cover_image?: string }): Promise<Series> {
+  return request<Series>('/api/series', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateSeries(slug: string, data: { title?: string; description?: string; cover_image?: string }): Promise<Series> {
+  return request<Series>(`/api/series/${slug}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteSeries(slug: string): Promise<void> {
+  await request(`/api/series/${slug}`, { method: 'DELETE' });
+}
+
+export async function addPostToSeries(slug: string, postId: number, sortOrder?: number): Promise<void> {
+  await request(`/api/series/${slug}/posts`, {
+    method: 'POST',
+    body: JSON.stringify({ post_id: postId, sort_order: sortOrder }),
+  });
+}
+
+export async function removePostFromSeries(slug: string, postId: number): Promise<void> {
+  await request(`/api/series/${slug}/posts?post_id=${postId}`, { method: 'DELETE' });
+}
+
+// ===== 邮箱订阅 =====
+export async function subscribe(email: string): Promise<{ ok: boolean; message?: string }> {
+  return request('/api/subscribe', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function unsubscribe(token: string): Promise<{ ok: boolean }> {
+  return request(`/api/unsubscribe?token=${encodeURIComponent(token)}`, { method: 'DELETE' });
+}
+
+// ===== 友情链接 =====
+export interface FriendLink {
+  id: number;
+  name: string;
+  url: string;
+  description: string;
+  sort_order: number;
+}
+
+export async function getFriendLinks(): Promise<FriendLink[]> {
+  return request<FriendLink[]>('/api/links');
+}
+
+export async function createFriendLink(data: { name: string; url: string; description?: string; sort_order?: number }): Promise<FriendLink> {
+  return request<FriendLink>('/api/links', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteFriendLink(id: number): Promise<void> {
+  await request(`/api/links?id=${id}`, { method: 'DELETE' });
 }
 
 // ===== 通知 =====

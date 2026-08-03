@@ -19,6 +19,7 @@ import 'prismjs/components/prism-markdown'
 import type { Post, Comment } from '../types'
 import {
   getPost,
+  getPostNeighbors,
   deletePost,
   getComments,
   createComment,
@@ -32,6 +33,7 @@ import {
   searchUsers,
   getUserProfile,
 } from '../api'
+import type { PostNeighbor } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import { useReadingHistory } from '../hooks/useReadingHistory'
 import SEO from '../components/SEO'
@@ -254,6 +256,8 @@ export default function PostDetail() {
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
   const [editBusy, setEditBusy] = useState(false)
+  // 评论折叠：记录被折叠的评论 id
+  const [collapsedComments, setCollapsedComments] = useState<Set<number>>(new Set())
 
   const { recordVisit, updateProgress } = useReadingHistory()
 
@@ -281,6 +285,18 @@ export default function PostDetail() {
   const [mentionResults, setMentionResults] = useState<Array<{ id: number; username: string; display_name: string | null; avatar: string | null }>>([])
   const [mentionIndex, setMentionIndex] = useState(-1)
   const [showMentions, setShowMentions] = useState(false)
+
+  // 字体大小调节（持久化到 localStorage）
+  const [fontScale, setFontScale] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('postFontScale'))
+    return saved >= 80 && saved <= 160 ? saved : 100
+  })
+  useEffect(() => {
+    localStorage.setItem('postFontScale', String(fontScale))
+  }, [fontScale])
+
+  // 上一篇/下一篇导航
+  const [neighbors, setNeighbors] = useState<{ previous: PostNeighbor | null; next: PostNeighbor | null }>({ previous: null, next: null })
 
   const loadPost = useCallback(() => {
     if (!slug) return
@@ -350,6 +366,12 @@ export default function PostDetail() {
   useEffect(() => {
     loadPost()
   }, [loadPost])
+
+  // 加载上下篇导航
+  useEffect(() => {
+    if (!slug) return
+    getPostNeighbors(slug).then(setNeighbors).catch(() => {})
+  }, [slug])
 
   // 加载作者社交资料
   useEffect(() => {
@@ -721,6 +743,23 @@ export default function PostDetail() {
   const topLevel = comments.filter((c) => !c.parent_id)
   const repliesOf = (id: number) => comments.filter((c) => c.parent_id === id)
 
+  // 统计某条评论下所有子孙回复总数（递归）
+  function countAllReplies(id: number): number {
+    const kids = repliesOf(id)
+    let n = kids.length
+    for (const k of kids) n += countAllReplies(k.id)
+    return n
+  }
+
+  function toggleCollapse(id: number) {
+    setCollapsedComments((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   function renderComment(c: Comment) {
     const isMine = user && c.user_id === user.id
     const canDel = isMine || user?.role === 'admin'
@@ -730,8 +769,10 @@ export default function PostDetail() {
     const cLiked = !!c.liked
     const cLikesCount = c.likes_count ?? 0
     const cBusy = !!commentLikeBusy[c.id]
+    const isCollapsed = collapsedComments.has(c.id)
+    const totalReplies = kids.length > 0 ? countAllReplies(c.id) : 0
     return (
-      <li key={c.id} className="comment">
+      <li key={c.id} className={`comment${isCollapsed ? ' comment--collapsed' : ''}`}>
         <Link to={`/${c.author_username}`} className="comment__avatar">
           {c.author_avatar ? (
             <img src={c.author_avatar} alt={c.author_username} loading="lazy" />
@@ -751,8 +792,31 @@ export default function PostDetail() {
                 {formatRelative(c.created_at)}
                 {c.updated_at && <span className="comment__edited">（已编辑）</span>}
               </span>
+              {/* 折叠/展开按钮：始终可点击 */}
+              <button
+                type="button"
+                className="comment__collapse-btn"
+                onClick={() => toggleCollapse(c.id)}
+                title={isCollapsed ? '展开评论' : '折叠评论'}
+                aria-expanded={!isCollapsed}
+              >
+                {isCollapsed ? '▸' : '▾'}
+              </button>
             </div>
-            {isEditing ? (
+            {isCollapsed ? (
+              <div className="comment__collapsed-summary">
+                <span className="comment__collapsed-text">已折叠</span>
+                {totalReplies > 0 && (
+                  <button
+                    type="button"
+                    className="comment__collapsed-replies"
+                    onClick={() => toggleCollapse(c.id)}
+                  >
+                    {totalReplies} 条回复
+                  </button>
+                )}
+              </div>
+            ) : isEditing ? (
               <div className="comment__edit">
                 <textarea
                   rows={3}
@@ -784,83 +848,97 @@ export default function PostDetail() {
               <p className="comment__content">{renderCommentContent(c.content)}</p>
             )}
           </div>
-          <div className="comment__actions">
-            <button
-              type="button"
-              className={`comment__like ${cLiked ? 'comment__like--active' : ''}`}
-              onClick={() => handleToggleCommentLike(c.id)}
-              disabled={cBusy}
-              title={user ? '点赞' : '登录后点赞'}
-            >
-              <span className="comment__like-icon">{cLiked ? '♥' : '♡'}</span>
-              <span className="comment__like-count">{cLikesCount}</span>
-            </button>
-            {user && (
-              <button
-                type="button"
-                className="comment__action"
-                onClick={() => {
-                  setReplyTo(replyTo === c.id ? null : c.id)
-                  setReplyText('')
-                }}
-              >
-                回复
-              </button>
-            )}
-            {canEdit && !isEditing && (
-              <button
-                type="button"
-                className="comment__action"
-                onClick={() => {
-                  setEditingCommentId(c.id)
-                  setEditText(c.content)
-                }}
-              >
-                编辑
-              </button>
-            )}
-            {canDel && (
-              <button
-                type="button"
-                className="comment__action comment__action--danger"
-                onClick={() => handleDeleteComment(c.id)}
-              >
-                删除
-              </button>
-            )}
-          </div>
-          {replyTo === c.id && (
-            <div className="reply-box">
-              <textarea
-                rows={2}
-                placeholder={`回复 @${c.author_username}…`}
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-              />
-              <div className="reply-box__actions">
+          {!isCollapsed && (
+            <>
+              <div className="comment__actions">
                 <button
                   type="button"
-                  className="btn-secondary"
-                  onClick={() => {
-                    setReplyTo(null)
-                    setReplyText('')
-                  }}
+                  className={`comment__like ${cLiked ? 'comment__like--active' : ''}`}
+                  onClick={() => handleToggleCommentLike(c.id)}
+                  disabled={cBusy}
+                  title={user ? '点赞' : '登录后点赞'}
                 >
-                  取消
+                  <span className="comment__like-icon">{cLiked ? '♥' : '♡'}</span>
+                  <span className="comment__like-count">{cLikesCount}</span>
                 </button>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={() => handleSubmitReply(c.id)}
-                  disabled={!replyText.trim()}
-                >
-                  回复
-                </button>
+                {user && (
+                  <button
+                    type="button"
+                    className="comment__action"
+                    onClick={() => {
+                      setReplyTo(replyTo === c.id ? null : c.id)
+                      setReplyText('')
+                    }}
+                  >
+                    回复
+                  </button>
+                )}
+                {canEdit && !isEditing && (
+                  <button
+                    type="button"
+                    className="comment__action"
+                    onClick={() => {
+                      setEditingCommentId(c.id)
+                      setEditText(c.content)
+                    }}
+                  >
+                    编辑
+                  </button>
+                )}
+                {canDel && (
+                  <button
+                    type="button"
+                    className="comment__action comment__action--danger"
+                    onClick={() => handleDeleteComment(c.id)}
+                  >
+                    删除
+                  </button>
+                )}
+                {/* 折叠整条评论树（含回复）按钮 */}
+                {kids.length > 0 && (
+                  <button
+                    type="button"
+                    className="comment__action comment__action--collapse"
+                    onClick={() => toggleCollapse(c.id)}
+                  >
+                    折叠{totalReplies > 0 ? ` (${totalReplies})` : ''}
+                  </button>
+                )}
               </div>
-            </div>
-          )}
-          {kids.length > 0 && (
-            <ul className="comment__replies">{kids.map(renderComment)}</ul>
+              {replyTo === c.id && (
+                <div className="reply-box">
+                  <textarea
+                    rows={2}
+                    placeholder={`回复 @${c.author_username}…`}
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                  />
+                  <div className="reply-box__actions">
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => {
+                        setReplyTo(null)
+                        setReplyText('')
+                      }}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => handleSubmitReply(c.id)}
+                      disabled={!replyText.trim()}
+                    >
+                      回复
+                    </button>
+                  </div>
+                </div>
+              )}
+              {kids.length > 0 && (
+                <ul className="comment__replies">{kids.map(renderComment)}</ul>
+              )}
+            </>
           )}
         </div>
       </li>
@@ -888,6 +966,23 @@ export default function PostDetail() {
           <Link to="/" className="back-link">
             ← 返回论坛
           </Link>
+          <div className="article__font-controls" role="group" aria-label="字体大小">
+            <button
+              type="button"
+              className="article__font-btn"
+              title="缩小字体"
+              onClick={() => setFontScale((s) => Math.max(80, s - 10))}
+              disabled={fontScale <= 80}
+            >A−</button>
+            <span className="article__font-scale">{fontScale}%</span>
+            <button
+              type="button"
+              className="article__font-btn"
+              title="放大字体"
+              onClick={() => setFontScale((s) => Math.min(160, s + 10))}
+              disabled={fontScale >= 160}
+            >A+</button>
+          </div>
         </div>
 
         <header className="article__header">
@@ -933,6 +1028,7 @@ export default function PostDetail() {
 
         <div
           className="article__body"
+          style={{ fontSize: `${fontScale}%` }}
           dangerouslySetInnerHTML={{ __html: renderMarkdown(post.content) }}
         />
 
@@ -995,6 +1091,28 @@ export default function PostDetail() {
           </div>
         </footer>
 
+        {/* 上一篇 / 下一篇导航 */}
+        {(neighbors.previous || neighbors.next) && (
+          <nav className="post-nav" aria-label="文章导航">
+            {neighbors.previous ? (
+              <Link to={`/post/${neighbors.previous.slug}`} className="post-nav__item post-nav__item--prev">
+                <span className="post-nav__label">← 上一篇</span>
+                <span className="post-nav__title">{neighbors.previous.title}</span>
+              </Link>
+            ) : (
+              <span className="post-nav__item post-nav__item--prev post-nav__item--empty" />
+            )}
+            {neighbors.next ? (
+              <Link to={`/post/${neighbors.next.slug}`} className="post-nav__item post-nav__item--next">
+                <span className="post-nav__label">下一篇 →</span>
+                <span className="post-nav__title">{neighbors.next.title}</span>
+              </Link>
+            ) : (
+              <span className="post-nav__item post-nav__item--next post-nav__item--empty" />
+            )}
+          </nav>
+        )}
+
         {/* Comments section */}
         <section className="comments" id="comments">
           <div className="comments__header">
@@ -1002,6 +1120,23 @@ export default function PostDetail() {
               对话
             </h2>
             <span className="comments__count">{comments.length} 条评论</span>
+            {topLevel.length > 0 && (
+              <button
+                type="button"
+                className="comments__toggle-all"
+                onClick={() => {
+                  // 若当前有任意顶层评论被折叠，则全部展开；否则全部折叠
+                  const anyCollapsed = topLevel.some((c) => collapsedComments.has(c.id))
+                  if (anyCollapsed) {
+                    setCollapsedComments(new Set())
+                  } else {
+                    setCollapsedComments(new Set(topLevel.map((c) => c.id)))
+                  }
+                }}
+              >
+                {topLevel.some((c) => collapsedComments.has(c.id)) ? '展开全部' : '折叠全部'}
+              </button>
+            )}
           </div>
 
           {user ? (

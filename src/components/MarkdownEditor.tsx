@@ -114,8 +114,28 @@ export default function MarkdownEditor({
     }
   }
 
-  /** Tab 缩进 */
+  /** Tab 缩进 + Markdown 快捷键 (Ctrl+B 加粗 / Ctrl+I 斜体 / Ctrl+K 插链接) */
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // Ctrl/Cmd + 字母组合
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+      const k = e.key.toLowerCase()
+      if (k === 'b') {
+        e.preventDefault()
+        wrapSelection('**', '**', '加粗文字')
+        return
+      }
+      if (k === 'i') {
+        e.preventDefault()
+        wrapSelection('*', '*', '斜体文字')
+        return
+      }
+      if (k === 'k') {
+        e.preventDefault()
+        insertLink()
+        return
+      }
+    }
+
     if (e.key === 'Tab') {
       e.preventDefault()
       const ta = e.currentTarget

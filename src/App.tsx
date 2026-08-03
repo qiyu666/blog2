@@ -32,6 +32,10 @@ const Customize = lazy(() => import('./pages/Customize'))
 const Archives = lazy(() => import('./pages/Archives'))
 const TagPage = lazy(() => import('./pages/Tag'))
 const History = lazy(() => import('./pages/History'))
+const SeriesList = lazy(() => import('./pages/SeriesList'))
+const SeriesDetail = lazy(() => import('./pages/SeriesDetail'))
+const Links = lazy(() => import('./pages/Links'))
+const Unsubscribe = lazy(() => import('./pages/Unsubscribe'))
 
 export default function App() {
   return (
@@ -46,6 +50,10 @@ export default function App() {
           <Route path="/archives" element={<Archives />} />
           <Route path="/tag/:tag" element={<TagPage />} />
           <Route path="/history" element={<History />} />
+          <Route path="/series" element={<SeriesList />} />
+          <Route path="/series/:slug" element={<SeriesDetail />} />
+          <Route path="/links" element={<Links />} />
+          <Route path="/unsubscribe" element={<Unsubscribe />} />
           <Route
             path="/new"
             element={

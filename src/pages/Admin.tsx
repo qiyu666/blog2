@@ -11,6 +11,8 @@ import {
   deleteComment,
   getBugs,
   batchPostAction,
+  getAnalytics,
+  type AnalyticsData,
   type AdminUser,
   type AdminPost,
   type AdminComment,
@@ -77,6 +79,7 @@ export default function Admin() {
   const [comments, setComments] = useState<AdminComment[]>([])
   const [reports, setReports] = useState<AdminReport[]>([])
   const [bugs, setBugs] = useState<BugReportItem[]>([])
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
@@ -93,16 +96,18 @@ export default function Admin() {
       else if (tab === 'bugs') setBugs(await getBugs())
       else if (tab === 'reports') setReports(await getAdminReports())
       else if (tab === 'dashboard') {
-        const [u, p, c, b] = await Promise.all([
+        const [u, p, c, b, a] = await Promise.all([
           getAdminUsers(),
           getAdminPosts(),
           getAdminComments(),
           getBugs(),
+          getAnalytics(),
         ])
         setUsers(u)
         setPosts(p)
         setComments(c)
         setBugs(b)
+        setAnalytics(a)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败')
@@ -569,7 +574,7 @@ export default function Admin() {
 
           {/* 仪表盘 */}
           {activeTab === 'dashboard' && (
-            <DashboardView stats={stats} posts={posts} comments={comments} users={users} categoryStats={categoryStats} />
+            <DashboardView stats={stats} posts={posts} comments={comments} users={users} categoryStats={categoryStats} analytics={analytics} />
           )}
 
           {/* 用户管理 */}
@@ -684,18 +689,88 @@ export default function Admin() {
 }
 
 // ===== 仪表盘 =====
+function TrendChart({ data }: { data: Array<{ date: string; posts: number; users: number; comments: number }> }) {
+  if (!data || data.length === 0) return null
+  const maxValue = Math.max(...data.flatMap((d) => [d.posts, d.users, d.comments]), 1)
+  const chartWidth = 600
+  const chartHeight = 200
+  const barWidth = 18
+  const groupWidth = 75
+  const axisWidth = 50
+
+  function formatDateLabel(dateStr: string): string {
+    const d = new Date(dateStr + 'T00:00:00Z')
+    return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`
+  }
+
+  return (
+    <svg className="trend-chart" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none">
+      {/* 网格线 */}
+      {[0, 0.25, 0.5, 0.75, 1].map((p) => (
+        <line
+          key={p}
+          x1={axisWidth}
+          x2={chartWidth}
+          y1={chartHeight - 20 - p * 150}
+          y2={chartHeight - 20 - p * 150}
+          stroke="var(--line-soft)"
+          strokeWidth="1"
+          strokeDasharray={p === 0 ? '0' : '3 3'}
+        />
+      ))}
+      {/* 柱状图 */}
+      {data.map((item, i) => {
+        const x = axisWidth + 10 + i * groupWidth
+        const baseY = chartHeight - 20
+        return (
+          <g key={item.date} transform={`translate(${x}, 0)`}>
+            <rect
+              y={baseY - (item.posts / maxValue) * 150}
+              height={(item.posts / maxValue) * 150}
+              width={barWidth}
+              fill="var(--violet)"
+              rx="2"
+            />
+            <rect
+              x={barWidth + 3}
+              y={baseY - (item.users / maxValue) * 150}
+              height={(item.users / maxValue) * 150}
+              width={barWidth}
+              fill="var(--accent)"
+              rx="2"
+            />
+            <rect
+              x={(barWidth + 3) * 2}
+              y={baseY - (item.comments / maxValue) * 150}
+              height={(item.comments / maxValue) * 150}
+              width={barWidth}
+              fill="var(--pink)"
+              rx="2"
+            />
+            <text x={barWidth * 1.5} y={chartHeight - 4} textAnchor="middle" className="trend-chart__label">
+              {formatDateLabel(item.date)}
+            </text>
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
 function DashboardView({
   stats,
   posts,
   comments,
   users,
   categoryStats,
+  analytics,
 }: {
   stats: any
   posts: AdminPost[]
   comments: AdminComment[]
   users: AdminUser[]
   categoryStats: { name: string; count: number }[]
+  analytics: AnalyticsData | null
 }) {
   const statCards = [
     { label: '总用户数', value: stats.users, icon: '👥', color: 'var(--accent)', change: `+${Math.min(stats.users, 5)} 本周` },
@@ -736,29 +811,23 @@ function DashboardView({
         ))}
       </div>
 
-      {/* 图表区域占位 */}
+      {/* 图表区域 */}
       <div className="dashboard__charts">
         <div className="chart-card">
           <div className="chart-card__header">
-            <h3 className="chart-card__title">访问趋势</h3>
+            <h3 className="chart-card__title">近 7 天访问趋势</h3>
             <div className="chart-card__tabs">
-              <button type="button" className="chart-card__tab chart-card__tab--active">7天</button>
-              <button type="button" className="chart-card__tab">30天</button>
+              <span className="chart-card__legend">文章 / 用户 / 评论</span>
             </div>
           </div>
           <div className="chart-card__body">
-            <div className="chart-placeholder">
-              <div className="chart-placeholder__bars">
-                {[40, 65, 45, 80, 55, 90, 70].map((h, i) => (
-                  <div
-                    key={i}
-                    className="chart-placeholder__bar"
-                    style={{ height: `${h}%` }}
-                  />
-                ))}
+            {analytics?.trends7d && analytics.trends7d.length > 0 ? (
+              <TrendChart data={analytics.trends7d} />
+            ) : (
+              <div className="chart-placeholder">
+                <div className="chart-placeholder__text">暂无数据</div>
               </div>
-              <div className="chart-placeholder__text">数据可视化开发中...</div>
-            </div>
+            )}
           </div>
         </div>
 
