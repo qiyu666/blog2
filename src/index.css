@@ -10927,6 +10927,20 @@ a.profile-stat {
   height: 14px;
 }
 
+/* ===== Post Sidebar Social ===== */
+.post-sidebar__social {
+  display: flex;
+  justify-content: center;
+  padding-top: var(--space-md);
+  margin-top: var(--space-md);
+  border-top: 1px solid var(--line);
+}
+
+.post-sidebar__social .social-links {
+  margin-top: 0;
+  gap: 0.5rem;
+}
+
 /* ===== Own Profile Social Empty Hint ===== */
 .profile-social-empty {
   margin-top: var(--space-sm);

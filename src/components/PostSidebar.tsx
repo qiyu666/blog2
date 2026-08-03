@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import type { Post } from '../types';
 import { getPosts, getUserProfile } from '../api';
+import SocialLinks from './SocialLinks';
 
 interface PostSidebarProps {
   post: Post;
@@ -10,6 +11,15 @@ interface PostSidebarProps {
 export default function PostSidebar({ post }: PostSidebarProps) {
   const [authorPosts, setAuthorPosts] = useState<Post[]>([]);
   const [authorBio, setAuthorBio] = useState('');
+  const [authorSocial, setAuthorSocial] = useState<{
+    social_github?: string;
+    social_twitter?: string;
+    social_qq?: string;
+    social_wechat?: string;
+    social_telegram?: string;
+    social_bilibili?: string;
+    social_email?: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,12 +32,22 @@ export default function PostSidebar({ post }: PostSidebarProps) {
         posts.filter((p) => p.author_username === post.author_username && p.id !== post.id).slice(0, 5)
       ),
       getUserProfile(post.author_username)
-        .then((profile) => profile.user.bio)
+        .then((profile) => {
+          setAuthorBio(profile.user.bio || '');
+          setAuthorSocial({
+            social_github: profile.user.social_github,
+            social_twitter: profile.user.social_twitter,
+            social_qq: profile.user.social_qq,
+            social_wechat: profile.user.social_wechat,
+            social_telegram: profile.user.social_telegram,
+            social_bilibili: profile.user.social_bilibili,
+            social_email: profile.user.social_email,
+          });
+        })
         .catch(() => ''),
     ])
-      .then(([posts, bio]) => {
+      .then(([posts]) => {
         setAuthorPosts(posts);
-        setAuthorBio(bio);
         setLoading(false);
       })
       .catch(() => {
@@ -78,6 +98,11 @@ export default function PostSidebar({ post }: PostSidebarProps) {
             <span className="post-sidebar__stat-label">次浏览</span>
           </div>
         </div>
+        {authorSocial && (
+          <div className="post-sidebar__social">
+            <SocialLinks user={authorSocial} size="sm" />
+          </div>
+        )}
       </div>
 
       {/* 标签 */}
