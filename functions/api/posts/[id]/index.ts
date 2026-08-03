@@ -146,9 +146,14 @@ export async function onRequestPut(context: {
   const published = body.published === 0 ? 0 : 1
 
   // is_pinned / is_featured: admin can set them; non-admin preserves existing values.
+  // 当字段未提供（undefined）时保留原值，避免普通编辑意外清空置顶/精选。
   const isAdmin = user.role === 'admin'
-  const is_pinned = isAdmin ? (body.is_pinned === 1 ? 1 : 0) : (existing.is_pinned || 0)
-  const is_featured = isAdmin ? (body.is_featured === 1 ? 1 : 0) : (existing.is_featured || 0)
+  const is_pinned = isAdmin
+    ? (body.is_pinned === 0 || body.is_pinned === 1 ? body.is_pinned : (existing.is_pinned || 0))
+    : (existing.is_pinned || 0)
+  const is_featured = isAdmin
+    ? (body.is_featured === 0 || body.is_featured === 1 ? body.is_featured : (existing.is_featured || 0))
+    : (existing.is_featured || 0)
 
   const newSlug = title !== existing.title
     ? await uniqueSlug(env.DB, slugify(title), postId)

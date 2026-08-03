@@ -124,6 +124,12 @@
     "searchContent": "Search",
     "countdown": "Returning home in {{count}} seconds"
   },
+  "error": {
+    "title": "Something went wrong",
+    "desc": "The page encountered an issue. Please try again or go back to the home page.",
+    "reload": "Reload",
+    "home": "Back to Home"
+  },
   "footer": {
     "newsletterEyebrow": "Marginalia Letter",
     "newsletterTitle": "Slow ideas,",

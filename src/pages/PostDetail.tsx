@@ -35,6 +35,7 @@ import { useAuth } from '../auth/AuthContext'
 import SEO from '../components/SEO'
 import PostSidebar from '../components/PostSidebar'
 import SocialLinks from '../components/SocialLinks'
+import DOMPurify from 'dompurify'
 
 /** Minimal markdown → HTML renderer (headings, lists, code, blockquote, bold, italic) */
 function renderMarkdown(md: string): string {
@@ -125,7 +126,8 @@ function renderMarkdown(md: string): string {
   }
   if (inList) html += '</ul>\n'
   if (inCode) html += `<pre class="code-block"><code class="language-${codeLang || 'text'}">${codeBuffer.join('\n').replace(/</g, '&lt;')}</code></pre>\n`
-  return html
+  // 用 DOMPurify 过滤 XSS：移除 javascript: 协议链接、事件处理器等危险内容
+  return DOMPurify.sanitize(html, { ADD_ATTR: ['target', 'rel'] })
 }
 
 function formatRelative(dateStr: string): string {
@@ -237,6 +239,11 @@ export default function PostDetail() {
       if (!el) return
       const rect = el.getBoundingClientRect()
       const total = el.scrollHeight - window.innerHeight
+      // 文章短于视口时 total <= 0，直接置 0 避免 NaN%
+      if (total <= 0) {
+        setReadProgress(0)
+        return
+      }
       const scrolled = -rect.top
       const pct = Math.min(Math.max(scrolled / total * 100, 0), 100)
       setReadProgress(pct)

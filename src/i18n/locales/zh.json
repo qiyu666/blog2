@@ -124,6 +124,12 @@
     "searchContent": "搜索内容",
     "countdown": "{{count}} 秒后自动返回首页"
   },
+  "error": {
+    "title": "出错了",
+    "desc": "页面遇到了一些问题，请稍后重试或返回首页。",
+    "reload": "刷新页面",
+    "home": "返回首页"
+  },
   "footer": {
     "newsletterEyebrow": "慢思通讯",
     "newsletterTitle": "慢想法，",

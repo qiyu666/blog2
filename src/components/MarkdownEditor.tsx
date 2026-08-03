@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo } from 'react'
+import DOMPurify from 'dompurify'
 
 interface Props {
   value: string
@@ -270,5 +271,6 @@ function renderMarkdown(md: string): string {
   }
   if (inList) html += '</ul>\n'
   if (inCode) html += `<pre><code>${codeBuffer.join('\n').replace(/</g, '&lt;')}</code></pre>\n`
-  return html
+  // 用 DOMPurify 过滤 XSS
+  return DOMPurify.sanitize(html, { ADD_ATTR: ['target', 'rel'] })
 }
