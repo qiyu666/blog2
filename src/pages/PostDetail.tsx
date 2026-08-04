@@ -20,6 +20,7 @@ import type { Post, Comment } from '../types'
 import {
   getPost,
   getPostNeighbors,
+  getRelatedPosts,
   deletePost,
   getComments,
   createComment,
@@ -32,19 +33,25 @@ import {
   reportTarget,
   searchUsers,
   getUserProfile,
+  estimateReadingTime,
+  recordPostView,
+  getPostStats,
+  createShareLink,
 } from '../api'
-import type { PostNeighbor } from '../api'
+import type { PostNeighbor, RelatedPost, PostStats } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import { useReadingHistory } from '../hooks/useReadingHistory'
-import SEO from '../components/SEO'
+import SEO, { setMetaTag, setJsonLd, cleanupDynamicMeta } from '../components/SEO'
 import PostSidebar from '../components/PostSidebar'
 import TableOfContents from '../components/TableOfContents'
 import SocialLinks from '../components/SocialLinks'
 import RevisionHistory from '../components/RevisionHistory'
+import ImageLightbox from '../components/ImageLightbox'
+import type { LightboxImage } from '../components/ImageLightbox'
 import DOMPurify from 'dompurify'
 
 /** Minimal markdown → HTML renderer (headings, lists, code, blockquote, bold, italic) */
-function renderMarkdown(
+export function renderMarkdown(
   md: string,
   options: { images?: boolean; mentions?: boolean } = {},
 ): string {
@@ -126,7 +133,7 @@ function renderMarkdown(
   for (const line of lines) {
     if (line.trim().startsWith('```')) {
       if (inCode) {
-        html += `<pre class="code-block"><code class="language-${codeLang || 'text'}">${codeBuffer.join('\n').replace(/</g, '&lt;')}</code></pre>\n`
+        html += `<pre class="code-block" data-lang="${codeLang || 'text'}"><code class="language-${codeLang || 'text'}">${codeBuffer.join('\n').replace(/</g, '&lt;')}</code></pre>\n`
         codeBuffer = []
         inCode = false
         codeLang = ''
@@ -180,10 +187,10 @@ function renderMarkdown(
     }
   }
   if (inList) html += '</ul>\n'
-  if (inCode) html += `<pre class="code-block"><code class="language-${codeLang || 'text'}">${codeBuffer.join('\n').replace(/</g, '&lt;')}</code></pre>\n`
+  if (inCode) html += `<pre class="code-block" data-lang="${codeLang || 'text'}"><code class="language-${codeLang || 'text'}">${codeBuffer.join('\n').replace(/</g, '&lt;')}</code></pre>\n`
   // 用 DOMPurify 过滤 XSS：移除 javascript: 协议链接、事件处理器等危险内容
   return DOMPurify.sanitize(html, {
-    ADD_ATTR: ['target', 'rel', 'class'],
+    ADD_ATTR: ['target', 'rel', 'class', 'data-lang'],
     FORBID_TAGS: images ? [] : ['img'],
   })
 }
@@ -238,6 +245,42 @@ function formatRelative(dateStr: string): string {
   return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
 
+/** 代码块语言标识 → 中文展示名 */
+const LANG_LABELS: Record<string, string> = {
+  javascript: 'JavaScript',
+  js: 'JavaScript',
+  typescript: 'TypeScript',
+  ts: 'TypeScript',
+  python: 'Python',
+  py: 'Python',
+  bash: 'Bash',
+  sh: 'Shell',
+  shell: 'Shell',
+  css: 'CSS',
+  json: 'JSON',
+  sql: 'SQL',
+  html: 'HTML',
+  markup: 'HTML',
+  java: 'Java',
+  c: 'C',
+  cpp: 'C++',
+  'c++': 'C++',
+  go: 'Go',
+  rust: 'Rust',
+  rs: 'Rust',
+  yaml: 'YAML',
+  yml: 'YAML',
+  markdown: 'Markdown',
+  md: 'Markdown',
+  text: '纯文本',
+  '': '代码',
+}
+
+function langLabel(lang: string): string {
+  const key = (lang || '').toLowerCase().trim()
+  return LANG_LABELS[key] || (key ? key.toUpperCase().slice(0, 1) + key.slice(1) : '代码')
+}
+
 /** Render comment content as sanitized Markdown HTML.
  *  Supports bold/italic/inline code/code blocks/links/lists/blockquotes (no images),
  *  and converts @username mentions into clickable internal links. */
@@ -281,6 +324,9 @@ export default function PostDetail() {
   const [favBusy, setFavBusy] = useState(false)
   const [reportBusy, setReportBusy] = useState(false)
 
+  // PV/UV 统计：仅作者或管理员可见
+  const [postStats, setPostStats] = useState<PostStats | null>(null)
+
   const [readProgress, setReadProgress] = useState(0)
 
   const [authorProfile, setAuthorProfile] = useState<{
@@ -310,8 +356,23 @@ export default function PostDetail() {
   // 上一篇/下一篇导航
   const [neighbors, setNeighbors] = useState<{ previous: PostNeighbor | null; next: PostNeighbor | null }>({ previous: null, next: null })
 
+  // 相关文章推荐
+  const [relatedPosts, setRelatedPosts] = useState<RelatedPost[]>([])
+
   // 历史版本弹窗
   const [showRevisions, setShowRevisions] = useState(false)
+
+  // 图片灯箱
+  const [lightboxImages, setLightboxImages] = useState<LightboxImage[]>([])
+  const [lightboxIndex, setLightboxIndex] = useState(0)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+
+  // 草稿分享弹窗
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
+  const [shareUrl, setShareUrl] = useState('')
+  const [shareBusy, setShareBusy] = useState(false)
+  const [shareError, setShareError] = useState('')
+  const [shareCopied, setShareCopied] = useState(false)
 
   const loadPost = useCallback(() => {
     if (!slug) return
@@ -382,10 +443,99 @@ export default function PostDetail() {
     loadPost()
   }, [loadPost])
 
+  // 上报访问（PV/UV）：每篇文章每次加载仅记录一次
+  useEffect(() => {
+    if (!post?.slug) return
+    // 仅对已发布文章上报；草稿预览不计入统计
+    if (!post.published) return
+    recordPostView(post.slug)
+  }, [post?.slug, post?.published])
+
+  // 作者或管理员可查看该文章的 PV/UV
+  useEffect(() => {
+    if (!post?.slug || !user) {
+      setPostStats(null)
+      return
+    }
+    const isAuthor = post.author_id != null && post.author_id === user.id
+    const isAdmin = user.role === 'admin'
+    if (!isAuthor && !isAdmin) {
+      setPostStats(null)
+      return
+    }
+    let active = true
+    getPostStats(post.slug)
+      .then((s) => {
+        if (active) setPostStats(s)
+      })
+      .catch(() => {
+        if (active) setPostStats(null)
+      })
+    return () => {
+      active = false
+    }
+  }, [post?.slug, post?.author_id, user])
+
+  // 动态注入 Open Graph / Twitter Card / JSON-LD 结构化数据，
+  // 组件卸载或切换文章时清理，避免污染其他页面。
+  useEffect(() => {
+    if (!post) return
+    const postUrl = `${window.location.origin}/post/${post.slug}`
+    const description = post.excerpt || post.content.slice(0, 150)
+    const image = post.cover_image || ''
+
+    // Open Graph
+    setMetaTag('og:title', post.title, true)
+    setMetaTag('og:description', description, true)
+    setMetaTag('og:type', 'article', true)
+    setMetaTag('og:site_name', 'Marginalia', true)
+    setMetaTag('og:url', postUrl, true)
+    if (image) setMetaTag('og:image', image, true)
+
+    // Twitter Card
+    setMetaTag('twitter:card', image ? 'summary_large_image' : 'summary')
+    setMetaTag('twitter:title', post.title)
+    setMetaTag('twitter:description', description)
+    if (image) setMetaTag('twitter:image', image)
+
+    // JSON-LD Article 结构化数据
+    setJsonLd({
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: post.title,
+      description,
+      image: image || undefined,
+      author: {
+        '@type': 'Person',
+        name: post.author_username || post.author || '匿名',
+      },
+      publisher: {
+        '@type': 'Organization',
+        name: 'Marginalia',
+      },
+      datePublished: new Date(post.created_at + 'Z').toISOString(),
+      dateModified: new Date((post.updated_at || post.created_at) + 'Z').toISOString(),
+      mainEntityOfPage: {
+        '@type': 'WebPage',
+        '@id': postUrl,
+      },
+    })
+
+    return () => {
+      cleanupDynamicMeta()
+    }
+  }, [post])
+
   // 加载上下篇导航
   useEffect(() => {
     if (!slug) return
     getPostNeighbors(slug).then(setNeighbors).catch(() => {})
+  }, [slug])
+
+  // 加载相关文章推荐
+  useEffect(() => {
+    if (!slug) return
+    getRelatedPosts(slug).then(setRelatedPosts).catch(() => setRelatedPosts([]))
   }, [slug])
 
   // 加载作者社交资料
@@ -462,25 +612,75 @@ export default function PostDetail() {
     }
   }, [post?.id])
 
-  // Prism 语法高亮 + 复制按钮
+  // Prism 语法高亮 + 代码块头部（语言标签 + 复制按钮）
   useEffect(() => {
     if (!post) return
     Prism.highlightAll()
     document.querySelectorAll('.article__body pre.code-block').forEach(pre => {
-      if (pre.querySelector('.code-copy-btn')) return
-      const btn = document.createElement('button')
-      btn.className = 'code-copy-btn'
-      btn.textContent = '复制'
-      btn.onclick = async () => {
+      // 已处理过则跳过
+      if (pre.parentElement?.classList.contains('code-block-wrap')) return
+      const langAttr = pre.getAttribute('data-lang') || ''
+      const codeEl = pre.querySelector('code')
+      const langClass = codeEl?.className.match(/language-([\w-]+)/)
+      const lang = langAttr || (langClass ? langClass[1] : '') || 'text'
+
+      // 包裹容器
+      const wrap = document.createElement('div')
+      wrap.className = 'code-block-wrap'
+      // 头部栏：语言标签 + 复制按钮
+      const header = document.createElement('div')
+      header.className = 'code-block-header'
+      const langSpan = document.createElement('span')
+      langSpan.className = 'code-block-lang'
+      langSpan.textContent = langLabel(lang)
+      const copyBtn = document.createElement('button')
+      copyBtn.type = 'button'
+      copyBtn.className = 'code-block-copy'
+      copyBtn.textContent = '复制'
+      copyBtn.setAttribute('aria-label', '复制代码')
+      copyBtn.onclick = async () => {
         const code = pre.querySelector('code')
         if (!code) return
-        await navigator.clipboard.writeText(code.textContent || '')
-        btn.textContent = '已复制'
-        setTimeout(() => { btn.textContent = '复制' }, 2000)
+        try {
+          await navigator.clipboard.writeText(code.textContent || '')
+          copyBtn.textContent = '已复制'
+        } catch {
+          copyBtn.textContent = '复制失败'
+        }
+        setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
       }
-      ;(pre as HTMLElement).style.position = 'relative'
-      pre.appendChild(btn)
+      header.appendChild(langSpan)
+      header.appendChild(copyBtn)
+      wrap.appendChild(header)
+      // 把 pre 移入容器
+      pre.parentNode?.insertBefore(wrap, pre)
+      wrap.appendChild(pre)
     })
+  }, [post])
+
+  // 图片灯箱：为文章正文内所有图片绑定点击事件
+  useEffect(() => {
+    if (!post) return
+    const imgs = Array.from(document.querySelectorAll<HTMLImageElement>('.article__body img'))
+    if (imgs.length === 0) return
+    const handlers: Array<() => void> = []
+    imgs.forEach((img, idx) => {
+      img.style.cursor = 'zoom-in'
+      const handler = () => {
+        const sources: LightboxImage[] = imgs.map((i) => ({
+          src: i.src,
+          alt: i.alt || '',
+        }))
+        setLightboxImages(sources)
+        setLightboxIndex(idx)
+        setLightboxOpen(true)
+      }
+      img.addEventListener('click', handler)
+      handlers.push(() => img.removeEventListener('click', handler))
+    })
+    return () => {
+      handlers.forEach((off) => off())
+    }
   }, [post])
 
   async function handleDelete() {
@@ -491,6 +691,42 @@ export default function PostDetail() {
       navigate('/')
     } catch (err) {
       alert(err instanceof Error ? err.message : '删除失败')
+    }
+  }
+
+  async function handleShareDraft() {
+    if (!post) return
+    if (shareBusy) return
+    setShareBusy(true)
+    setShareError('')
+    try {
+      const res = await createShareLink(post.id)
+      const origin = window.location.origin
+      const url = origin + res.share_url
+      setShareUrl(url)
+      setShareDialogOpen(true)
+      setShareCopied(false)
+    } catch (err) {
+      setShareError(err instanceof Error ? err.message : '生成分享链接失败')
+      setShareDialogOpen(true)
+    } finally {
+      setShareBusy(false)
+    }
+  }
+
+  async function handleCopyShareLink() {
+    if (!shareUrl) return
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
+    } catch {
+      // 降级：选中文本
+      const input = document.querySelector('.share-link-input') as HTMLInputElement | null
+      if (input) {
+        input.select()
+        try { document.execCommand('copy'); setShareCopied(true); setTimeout(() => setShareCopied(false), 2000) } catch {}
+      }
     }
   }
 
@@ -1033,9 +1269,19 @@ export default function PostDetail() {
               })}
             </span>
             <span className="article__meta-divider">·</span>
-            <span>{post.views} 次浏览</span>
+            <span title={canEdit && postStats ? `PV ${postStats.pv} · UV ${postStats.uv}` : ''}>
+              {post.views} 次浏览
+            </span>
+            {canEdit && postStats && (
+              <>
+                <span className="article__meta-divider">·</span>
+                <span className="article__pvuv" title="浏览量 / 独立访客">
+                  👁 PV {postStats.pv} · UV {postStats.uv}
+                </span>
+              </>
+            )}
             <span className="article__meta-divider">·</span>
-            <span>{Math.ceil(post.content.length / 500)} 分钟阅读</span>
+            <span>约 {estimateReadingTime(post.content)} 分钟</span>
           </div>
           {authorProfile && <SocialLinks user={authorProfile} size="sm" />}
         </header>
@@ -1104,24 +1350,45 @@ export default function PostDetail() {
                 <span className="action-btn__count">{reportBusy ? '提交中…' : '举报'}</span>
               </button>
             </div>
-            {canEdit && (
-              <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
-                <Link to={`/edit/${post.id}`} className="btn-edit">
-                  编辑
-                </Link>
-                <button
-                  type="button"
-                  className="btn-edit"
-                  onClick={() => setShowRevisions(true)}
-                  title="查看历史版本"
-                >
-                  历史版本
-                </button>
-                <button onClick={handleDelete} className="btn-delete">
-                  删除
-                </button>
-              </div>
-            )}
+            <div style={{ display: 'flex', gap: 'var(--space-xs)', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="btn-edit article__print-btn"
+                onClick={() => window.print()}
+                title="打印文章"
+              >
+                打印
+              </button>
+              {canEdit && (
+                <>
+                  <Link to={`/edit/${post.id}`} className="btn-edit">
+                    编辑
+                  </Link>
+                  {!post.published && (
+                    <button
+                      type="button"
+                      className="btn-edit"
+                      onClick={handleShareDraft}
+                      disabled={shareBusy}
+                      title="生成草稿分享链接"
+                    >
+                      {shareBusy ? '生成中…' : '分享草稿'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-edit"
+                    onClick={() => setShowRevisions(true)}
+                    title="查看历史版本"
+                  >
+                    历史版本
+                  </button>
+                  <button onClick={handleDelete} className="btn-delete">
+                    删除
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </footer>
 
@@ -1145,6 +1412,27 @@ export default function PostDetail() {
               <span className="post-nav__item post-nav__item--next post-nav__item--empty" />
             )}
           </nav>
+        )}
+
+        {/* 相关文章推荐 */}
+        {relatedPosts.length > 0 && (
+          <section className="related-posts" aria-label="相关文章">
+            <h2 className="related-posts__title">相关文章</h2>
+            <ul className="related-posts__list">
+              {relatedPosts.slice(0, 4).map((rp) => {
+                const readTime = Math.max(1, Math.ceil((rp.excerpt || '').length / 100))
+                return (
+                  <li key={rp.id} className="related-posts__item">
+                    <Link to={`/post/${rp.slug}`} className="related-posts__link">
+                      <span className="related-posts__category">{rp.category}</span>
+                      <span className="related-posts__name">{rp.title}</span>
+                      <span className="related-posts__meta">{readTime} 分钟阅读</span>
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
         )}
 
         {/* Comments section */}
@@ -1308,6 +1596,69 @@ export default function PostDetail() {
         onRestored={() => loadPost()}
       />
     )}
+    {shareDialogOpen && (
+      <div
+        className="share-dialog-overlay"
+        onClick={() => setShareDialogOpen(false)}
+        role="dialog"
+        aria-modal="true"
+        aria-label="草稿分享链接"
+      >
+        <div className="share-dialog" onClick={(e) => e.stopPropagation()}>
+          <div className="share-dialog__header">
+            <h3 className="share-dialog__title">草稿分享链接</h3>
+            <button
+              type="button"
+              className="share-dialog__close"
+              onClick={() => setShareDialogOpen(false)}
+              aria-label="关闭"
+            >
+              ✕
+            </button>
+          </div>
+          <p className="share-dialog__desc">
+            任何持有此链接的人都可以在 7 天内查看这篇草稿，无需登录。链接过期后自动失效。
+          </p>
+          {shareError ? (
+            <div className="form__error">{shareError}</div>
+          ) : (
+            <>
+              <input
+                className="form__input share-link-input"
+                type="text"
+                value={shareUrl}
+                readOnly
+                onFocus={(e) => e.target.select()}
+              />
+              <div className="share-dialog__actions">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={handleCopyShareLink}
+                >
+                  {shareCopied ? '✓ 已复制' : '复制链接'}
+                </button>
+                <a
+                  className="btn-secondary"
+                  href={shareUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  打开预览
+                </a>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    )}
+    <ImageLightbox
+      images={lightboxImages}
+      index={lightboxIndex}
+      open={lightboxOpen}
+      onClose={() => setLightboxOpen(false)}
+      onIndexChange={setLightboxIndex}
+    />
     </>
   )
 }

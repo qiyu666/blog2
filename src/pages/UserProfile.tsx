@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { getUserProfile, toggleFollow, type UserProfile } from '../api'
+import { getUserProfile, toggleFollow, getUserActivity, type UserProfile, type ActivityItem } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import SEO from '../components/SEO'
 import SocialLinksBase from '../components/SocialLinks'
@@ -27,6 +27,7 @@ export default function UserProfile() {
   const styleRef = useRef<HTMLStyleElement | null>(null)
   const [activeCategory, setActiveCategory] = useState('全部')
   const [visibleCount, setVisibleCount] = useState(10)
+  const [profileTab, setProfileTab] = useState<'posts' | 'activity'>('posts')
 
   useEffect(() => {
     if (username && RESERVED_PATHS.includes(username.toLowerCase())) {
@@ -46,6 +47,7 @@ export default function UserProfile() {
     setError('')
     setActiveCategory('全部')
     setVisibleCount(10)
+    setProfileTab('posts')
     getUserProfile(username)
       .then((p) => {
         setProfile(p)
@@ -293,6 +295,9 @@ export default function UserProfile() {
             onShowMore={() => setVisibleCount((c) => c + 10)}
             isOwnProfile={isOwnProfile}
             displayName={displayName}
+            username={user.username}
+            profileTab={profileTab}
+            onTabChange={setProfileTab}
           />
         )
       case 'bio':
@@ -400,6 +405,9 @@ interface ProfilePostsProps {
   onShowMore: () => void
   isOwnProfile: boolean
   displayName: string
+  username: string
+  profileTab: 'posts' | 'activity'
+  onTabChange: (tab: 'posts' | 'activity') => void
 }
 
 function ProfilePosts({
@@ -411,6 +419,9 @@ function ProfilePosts({
   onShowMore,
   isOwnProfile,
   displayName,
+  username,
+  profileTab,
+  onTabChange,
 }: ProfilePostsProps) {
   const filtered =
     activeCategory === '全部'
@@ -421,96 +432,193 @@ function ProfilePosts({
 
   return (
     <div className="profile-posts" key="posts">
-      <div className="profile-posts__header">
-        <h2 className="profile-posts__title">
+      <div className="profile-posts__tabs">
+        <button
+          type="button"
+          className={`profile-posts__tab${profileTab === 'posts' ? ' profile-posts__tab--active' : ''}`}
+          onClick={() => onTabChange('posts')}
+        >
           {isOwnProfile ? '我的文章' : `${displayName} 的文章`}
-        </h2>
-        <span className="section-header__count">{filtered.length} 篇</span>
+        </button>
+        <button
+          type="button"
+          className={`profile-posts__tab${profileTab === 'activity' ? ' profile-posts__tab--active' : ''}`}
+          onClick={() => onTabChange('activity')}
+        >
+          活动
+        </button>
       </div>
 
-      {posts.length === 0 ? (
-        <div className="profile-posts__empty">
-          <div className="empty-state__icon">✍️</div>
-          <p>
-            {isOwnProfile ? '还没有发布过文章，去写第一篇吧' : 'TA还没有发布文章'}
-          </p>
-          {isOwnProfile && (
-            <Link to="/new" className="btn-primary">写一篇</Link>
-          )}
-        </div>
+      {profileTab === 'activity' ? (
+        <ActivityTimeline username={username} isOwnProfile={isOwnProfile} />
       ) : (
         <>
-          {categories.length > 0 && (
-            <div className="profile-posts__categories">
-              <button
-                type="button"
-                className={`profile-posts__category${activeCategory === '全部' ? ' profile-posts__category--active' : ''}`}
-                onClick={() => onSelectCategory('全部')}
-              >
-                全部
-              </button>
-              {categories.map((c) => (
-                <button
-                  key={c.category}
-                  type="button"
-                  className={`profile-posts__category${activeCategory === c.category ? ' profile-posts__category--active' : ''}`}
-                  onClick={() => onSelectCategory(c.category)}
-                >
-                  {c.category} ({c.count})
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="profile-posts__list">
-            {visible.map((post) => (
-              <Link
-                key={post.id}
-                to={`/post/${post.slug}`}
-                className="profile-post-card"
-              >
-                {post.cover_image && (
-                  <img
-                    src={post.cover_image}
-                    alt={post.title}
-                    className="profile-post-card__cover"
-                    loading="lazy"
-                  />
-                )}
-                <div className="profile-post-card__body">
-                  <span className="profile-post-card__category">{post.category}</span>
-                  <h3 className="profile-post-card__title">{post.title}</h3>
-                  {post.excerpt && (
-                    <p className="profile-post-card__excerpt">{post.excerpt}</p>
-                  )}
-                  <div className="profile-post-card__meta">
-                    <span>📅 {formatDate(post.created_at)}</span>
-                    <span>👁 {post.views ?? 0}</span>
-                    <span>❤️ {post.likes_count ?? 0}</span>
-                    <span>💬 {post.comments_count ?? 0}</span>
-                  </div>
-                </div>
-              </Link>
-            ))}
+          <div className="profile-posts__header">
+            <span className="section-header__count">{filtered.length} 篇</span>
           </div>
 
-          {visible.length === 0 && (
+          {posts.length === 0 ? (
             <div className="profile-posts__empty">
-              该分类下暂无文章
+              <div className="empty-state__icon">✍️</div>
+              <p>
+                {isOwnProfile ? '还没有发布过文章，去写第一篇吧' : 'TA还没有发布文章'}
+              </p>
+              {isOwnProfile && (
+                <Link to="/new" className="btn-primary">写一篇</Link>
+              )}
             </div>
-          )}
+          ) : (
+            <>
+              {categories.length > 0 && (
+                <div className="profile-posts__categories">
+                  <button
+                    type="button"
+                    className={`profile-posts__category${activeCategory === '全部' ? ' profile-posts__category--active' : ''}`}
+                    onClick={() => onSelectCategory('全部')}
+                  >
+                    全部
+                  </button>
+                  {categories.map((c) => (
+                    <button
+                      key={c.category}
+                      type="button"
+                      className={`profile-posts__category${activeCategory === c.category ? ' profile-posts__category--active' : ''}`}
+                      onClick={() => onSelectCategory(c.category)}
+                    >
+                      {c.category} ({c.count})
+                    </button>
+                  ))}
+                </div>
+              )}
 
-          {hasMore && (
-            <button
-              type="button"
-              className="profile-posts__more"
-              onClick={onShowMore}
-            >
-              加载更多
-            </button>
+              <div className="profile-posts__list">
+                {visible.map((post) => (
+                  <Link
+                    key={post.id}
+                    to={`/post/${post.slug}`}
+                    className="profile-post-card"
+                  >
+                    {post.cover_image && (
+                      <img
+                        src={post.cover_image}
+                        alt={post.title}
+                        className="profile-post-card__cover"
+                        loading="lazy"
+                      />
+                    )}
+                    <div className="profile-post-card__body">
+                      <span className="profile-post-card__category">{post.category}</span>
+                      <h3 className="profile-post-card__title">{post.title}</h3>
+                      {post.excerpt && (
+                        <p className="profile-post-card__excerpt">{post.excerpt}</p>
+                      )}
+                      <div className="profile-post-card__meta">
+                        <span>📅 {formatDate(post.created_at)}</span>
+                        <span>👁 {post.views ?? 0}</span>
+                        <span>❤️ {post.likes_count ?? 0}</span>
+                        <span>💬 {post.comments_count ?? 0}</span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+
+              {visible.length === 0 && (
+                <div className="profile-posts__empty">
+                  该分类下暂无文章
+                </div>
+              )}
+
+              {hasMore && (
+                <button
+                  type="button"
+                  className="profile-posts__more"
+                  onClick={onShowMore}
+                >
+                  加载更多
+                </button>
+              )}
+            </>
           )}
         </>
       )}
+    </div>
+  )
+}
+
+// ===== 用户活动时间线 =====
+interface ActivityTimelineProps {
+  username: string
+  isOwnProfile: boolean
+}
+
+function ActivityTimeline({ username, isOwnProfile }: ActivityTimelineProps) {
+  const [activities, setActivities] = useState<ActivityItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError('')
+    getUserActivity(username)
+      .then((items) => {
+        if (!cancelled) {
+          setActivities(items)
+          setLoading(false)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message || '加载失败')
+          setLoading(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [username])
+
+  if (loading) return <div className="loading">加载中</div>
+  if (error) return <div className="profile-posts__empty">{error}</div>
+  if (activities.length === 0) {
+    return (
+      <div className="profile-posts__empty">
+        <div className="empty-state__icon">📊</div>
+        <p>{isOwnProfile ? '你还没有活动记录' : 'TA还没有活动记录'}</p>
+      </div>
+    )
+  }
+
+  const typeMeta: Record<ActivityItem['type'], { icon: string; verb: string }> = {
+    post: { icon: '📝', verb: '发布了' },
+    comment: { icon: '💬', verb: '评论了' },
+    like: { icon: '❤️', verb: '赞了' },
+    favorite: { icon: '⭐', verb: '收藏了' },
+  }
+
+  return (
+    <div className="activity-timeline">
+      {activities.map((item, idx) => {
+        const meta = typeMeta[item.type]
+        const link = item.target_slug ? `/post/${item.target_slug}` : '#'
+        return (
+          <div className="activity-timeline__item" key={`${item.type}-${item.target_id}-${idx}`}>
+            <span className="activity-timeline__icon">{meta.icon}</span>
+            <div className="activity-timeline__body">
+              <span className="activity-timeline__verb">{meta.verb}</span>
+              {item.target_slug ? (
+                <Link to={link} className="activity-timeline__target">
+                  {item.target_title}
+                </Link>
+              ) : (
+                <span className="activity-timeline__target">{item.target_title}</span>
+              )}
+              <span className="activity-timeline__time">{formatDate(item.created_at)}</span>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

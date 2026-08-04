@@ -1,16 +1,11 @@
 import { Link } from 'react-router-dom';
 import type { Post, SearchResult } from '../types';
 import { useReadingHistory } from '../hooks/useReadingHistory';
+import { estimateReadingTime } from '../api';
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr + 'Z');
   return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
-}
-
-function estimateReadTime(text: string): number {
-  const wordsPerMinute = 200;
-  const wordCount = text.split(/\s+/).length;
-  return Math.max(1, Math.ceil(wordCount / wordsPerMinute));
 }
 
 function timeAgo(ts: number): string {
@@ -34,7 +29,7 @@ export default function PostCard({ post, index = 0 }: { post: PostCardData; inde
   const author = post.author_username || (isPost(post) ? post.author : '') || '匿名';
   const isPinned = isPost(post) ? !!post.is_pinned : false;
   const isFeatured = isPost(post) ? !!post.is_featured : false;
-  const readTime = isPost(post) ? estimateReadTime(post.content) : 5;
+  const readTime = isPost(post) ? estimateReadingTime(post.content) : 5;
   const { history } = useReadingHistory();
   const readItem = history.find((i) => i.slug === post.slug);
 
@@ -71,7 +66,7 @@ export default function PostCard({ post, index = 0 }: { post: PostCardData; inde
         <span className="post-card__divider"></span>
         <span>{formatDate(post.created_at)}</span>
         <span className="post-card__divider"></span>
-        <span className="post-card__read-time">{readTime} 分钟</span>
+        <span className="post-card__read-time">约 {readTime} 分钟</span>
         <span className="post-card__stats">
           <span className="post-card__stat" title="点赞">♡ {post.likes_count ?? 0}</span>
           <span className="post-card__stat" title="评论">▭ {post.comments_count ?? 0}</span>

@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   getAdminUsers,
   getAdminPosts,
   getAdminComments,
+  getAdminPendingComments,
+  moderateComment,
   getAdminReports,
   updateReportStatus,
   updateUserRole,
@@ -16,6 +18,8 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  exportPosts,
+  importPosts,
   type AnalyticsData,
   type AdminUser,
   type AdminPost,
@@ -48,6 +52,7 @@ type Tab =
   | 'comments'
   | 'reports'
   | 'bugs'
+  | 'data'
   | 'settings'
 
 type BatchPostAction = 'delete' | 'publish' | 'unpublish' | 'pin' | 'unpin'
@@ -82,6 +87,7 @@ export default function Admin() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [posts, setPosts] = useState<AdminPost[]>([])
   const [comments, setComments] = useState<AdminComment[]>([])
+  const [pendingComments, setPendingComments] = useState<AdminComment[]>([])
   const [reports, setReports] = useState<AdminReport[]>([])
   const [bugs, setBugs] = useState<BugReportItem[]>([])
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
@@ -114,22 +120,31 @@ export default function Admin() {
         setPosts(p)
         setCategories(c)
       }
-      else if (tab === 'comments') setComments(await getAdminComments())
+      else if (tab === 'comments') {
+        const [all, pending] = await Promise.all([
+          getAdminComments(),
+          getAdminPendingComments(),
+        ])
+        setComments(all)
+        setPendingComments(pending)
+      }
       else if (tab === 'bugs') setBugs(await getBugs())
       else if (tab === 'reports') setReports(await getAdminReports())
       else if (tab === 'dashboard') {
-        const [u, p, c, b, a] = await Promise.all([
+        const [u, p, c, b, a, pending] = await Promise.all([
           getAdminUsers(),
           getAdminPosts(),
           getAdminComments(),
           getBugs(),
           getAnalytics(),
+          getAdminPendingComments(),
         ])
         setUsers(u)
         setPosts(p)
         setComments(c)
         setBugs(b)
         setAnalytics(a)
+        setPendingComments(pending)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败')
@@ -168,8 +183,20 @@ export default function Admin() {
     try {
       await deleteComment(id)
       setComments((prev) => prev.filter((c) => c.id !== id))
+      setPendingComments((prev) => prev.filter((c) => c.id !== id))
     } catch (err) {
       alert(err instanceof Error ? err.message : '删除失败')
+    }
+  }
+
+  async function handleModerateComment(id: number, action: 'approve' | 'reject' | 'spam') {
+    const label = action === 'approve' ? '通过' : action === 'reject' ? '拒绝' : '标记为垃圾'
+    if (!confirm(`确认${label}这条评论？`)) return
+    try {
+      await moderateComment(id, action)
+      setPendingComments((prev) => prev.filter((c) => c.id !== id))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '操作失败')
     }
   }
 
@@ -350,6 +377,7 @@ export default function Admin() {
       todayPosts,
       comments: comments.length,
       todayComments,
+      pendingComments: pendingComments.length,
       views: totalViews,
       likes: totalLikes,
       reports: reports.length,
@@ -357,7 +385,7 @@ export default function Admin() {
       bugs: bugs.length,
       openBugs,
     }
-  }, [users, posts, comments, reports, bugs])
+  }, [users, posts, comments, reports, bugs, pendingComments])
 
   // 分类统计（优先使用后端独立表数据，若为空则回退到从帖子中统计）
   const categoryStats = useMemo(() => {
@@ -517,6 +545,7 @@ export default function Admin() {
     {
       label: '系统设置',
       items: [
+        { key: 'data', label: '数据管理', icon: '💾' },
         { key: 'settings', label: '站点设置', icon: '⚙️' },
       ],
     },
@@ -532,6 +561,7 @@ export default function Admin() {
     comments: ['内容管理', '评论管理'],
     reports: ['社区管理', '举报审核'],
     bugs: ['社区管理', 'Bug反馈'],
+    data: ['系统设置', '数据管理'],
     settings: ['系统设置', '站点设置'],
   }
 
@@ -545,6 +575,7 @@ export default function Admin() {
     comments: { title: '评论管理', desc: '审核和管理用户评论' },
     reports: { title: '举报审核', desc: '处理用户举报内容' },
     bugs: { title: 'Bug反馈', desc: '处理用户提交的Bug和建议' },
+    data: { title: '数据管理', desc: '导出/导入文章数据' },
     settings: { title: '站点设置', desc: '配置站点基本信息和功能开关' },
   }
 
@@ -741,11 +772,13 @@ export default function Admin() {
             <CommentsView
               comments={filteredComments}
               totalComments={comments.length}
+              pendingComments={pendingComments}
               loading={loading}
               error={error}
               query={query}
               setQuery={setQuery}
               onDelete={handleDeleteComment}
+              onModerate={handleModerateComment}
             />
           )}
 
@@ -773,6 +806,11 @@ export default function Admin() {
               setQuery={setQuery}
               onUpdateStatus={handleUpdateBugStatus}
             />
+          )}
+
+          {/* 数据管理 */}
+          {activeTab === 'data' && (
+            <DataView />
           )}
 
           {/* 站点设置 */}
@@ -1658,22 +1696,92 @@ function TagsView({
 function CommentsView({
   comments,
   totalComments,
+  pendingComments,
   loading,
   error,
   query,
   setQuery,
   onDelete,
+  onModerate,
 }: {
   comments: AdminComment[]
   totalComments: number
+  pendingComments: AdminComment[]
   loading: boolean
   error: string
   query: string
   setQuery: (q: string) => void
   onDelete: (id: number) => void
+  onModerate: (id: number, action: 'approve' | 'reject' | 'spam') => void
 }) {
   return (
     <div className="admin-list-view">
+      {/* 待审核队列 */}
+      {pendingComments.length > 0 && (
+        <div className="admin-section" style={{ marginBottom: 'var(--space-md)' }}>
+          <div className="admin-section__header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-xs)' }}>
+            <h3 className="admin-section__title" style={{ margin: 0, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
+              <span>🟡 待审核评论</span>
+              <span className="admin-sidebar__item-count" style={{ background: 'var(--gold, #f59e0b)' }}>
+                {pendingComments.length}
+              </span>
+            </h3>
+          </div>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>内容</th>
+                  <th>作者</th>
+                  <th>所属帖子</th>
+                  <th>时间</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingComments.map((c) => (
+                  <tr key={c.id}>
+                    <td className="admin-table__content">{c.content}</td>
+                    <td className="admin-table__author">
+                      <Link to={`/${c.author_username}`}>@{c.author_username}</Link>
+                    </td>
+                    <td className="admin-table__title">
+                      <Link to={`/post/${c.post_slug}`}>{c.post_title}</Link>
+                    </td>
+                    <td className="admin-table__time">{formatTime(c.created_at)}</td>
+                    <td>
+                      <div className="admin-action-group">
+                        <button
+                          type="button"
+                          className="admin-action admin-action--primary"
+                          onClick={() => onModerate(c.id, 'approve')}
+                        >
+                          通过
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-action admin-action--warn"
+                          onClick={() => onModerate(c.id, 'reject')}
+                        >
+                          拒绝
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-action admin-action--danger"
+                          onClick={() => onModerate(c.id, 'spam')}
+                        >
+                          标记垃圾
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <AdminToolbar
         placeholder="搜索评论内容、作者、帖子…"
         query={query}
@@ -1723,6 +1831,156 @@ function CommentsView({
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ===== 数据管理 =====
+function DataView() {
+  const [busy, setBusy] = useState<'export-json' | 'export-md' | 'import' | null>(null)
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  async function handleExportJson() {
+    setBusy('export-json')
+    setMessage(null)
+    try {
+      await exportPosts('json')
+      setMessage({ type: 'success', text: 'JSON 导出已开始下载' })
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : '导出失败' })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function handleExportMarkdown() {
+    setBusy('export-md')
+    setMessage(null)
+    try {
+      await exportPosts('markdown')
+      setMessage({ type: 'success', text: 'Markdown 导出已开始下载' })
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : '导出失败' })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function handleImportFile(file: File) {
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      setMessage({ type: 'error', text: '请选择 .json 文件' })
+      return
+    }
+    setBusy('import')
+    setMessage(null)
+    try {
+      const text = await file.text()
+      let data: unknown
+      try {
+        data = JSON.parse(text)
+      } catch {
+        throw new Error('JSON 解析失败，文件格式不正确')
+      }
+      const result = await importPosts(data)
+      setMessage({
+        type: 'success',
+        text: `导入完成：成功 ${result.imported} 篇，跳过 ${result.skipped} 篇（共 ${result.total} 篇）${
+          result.errors && result.errors.length > 0 ? `；${result.errors.length} 条错误` : ''
+        }`,
+      })
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : '导入失败' })
+    } finally {
+      setBusy(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  return (
+    <div className="settings-view">
+      <div className="settings-section">
+        <h3 className="settings-section__title">导出文章</h3>
+        <p className="settings-hint" style={{ marginBottom: 'var(--space-sm)' }}>
+          将所有文章导出为本地文件，用于备份或迁移。
+        </p>
+        <div className="settings-form">
+          <div className="settings-item">
+            <label className="settings-label">JSON 格式</label>
+            <p className="settings-hint">包含全部字段（标题、内容、标签、时间等），适合完整备份</p>
+            <button
+              type="button"
+              className="admin-btn admin-btn--primary"
+              onClick={handleExportJson}
+              disabled={busy !== null}
+            >
+              {busy === 'export-json' ? '导出中…' : '⬇ 导出文章 (JSON)'}
+            </button>
+          </div>
+          <div className="settings-item">
+            <label className="settings-label">Markdown 格式</label>
+            <p className="settings-hint">每篇文章以 YAML frontmatter 开头，适合在其它 Markdown 工具中阅读</p>
+            <button
+              type="button"
+              className="admin-btn admin-btn--primary"
+              onClick={handleExportMarkdown}
+              disabled={busy !== null}
+            >
+              {busy === 'export-md' ? '导出中…' : '⬇ 导出文章 (Markdown)'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <h3 className="settings-section__title">导入文章</h3>
+        <p className="settings-hint" style={{ marginBottom: 'var(--space-sm)' }}>
+          上传 JSON 文件导入文章。已存在相同 slug 的文章会自动跳过。
+        </p>
+        <div className="settings-form">
+          <div className="settings-item">
+            <label className="settings-label">选择 JSON 文件</label>
+            <p className="settings-hint">支持数组格式 <code>[&#123;...&#125;]</code> 或 <code>&#123;"posts": [...]&#125;</code></p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) handleImportFile(f)
+              }}
+            />
+            <button
+              type="button"
+              className="admin-btn admin-btn--primary"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={busy !== null}
+            >
+              {busy === 'import' ? '导入中…' : '⬆ 导入文章'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {message && (
+        <div
+          className={`form__${message.type === 'success' ? 'success' : 'error'}`}
+          style={{
+            padding: 'var(--space-sm) var(--space-md)',
+            background:
+              message.type === 'success'
+                ? 'rgba(34, 197, 94, 0.1)'
+                : 'rgba(239, 68, 68, 0.1)',
+            border: `1px solid ${
+              message.type === 'success' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'
+            }`,
+            borderRadius: '8px',
+          }}
+        >
+          {message.text}
         </div>
       )}
     </div>

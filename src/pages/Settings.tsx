@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { updateProfile, changePassword, getUserProfile, type ProfileUpdate } from '../api'
+import { updateProfile, changePassword, getUserProfile, getTwoFactorStatus, setupTwoFactor, enableTwoFactor, disableTwoFactor, type ProfileUpdate, type TwoFactorSetup } from '../api'
 
 // imgbb 图床上传通过后端代理 /api/upload-avatar，API Key 存在服务端环境变量中
 
@@ -55,6 +55,14 @@ export default function Settings() {
   const [pwdError, setPwdError] = useState('')
   const [pwdSuccess, setPwdSuccess] = useState('')
 
+  // 2FA 状态
+  const [totpEnabled, setTotpEnabled] = useState(false)
+  const [totpSetup, setTotpSetup] = useState<TwoFactorSetup | null>(null)
+  const [totpCode, setTotpCode] = useState('')
+  const [totpLoading, setTotpLoading] = useState(false)
+  const [totpError, setTotpError] = useState('')
+  const [totpSuccess, setTotpSuccess] = useState('')
+
   useEffect(() => {
     if (user) {
       setDisplayName(user.display_name || '')
@@ -85,6 +93,22 @@ export default function Settings() {
       })
       .catch(() => {
         // ignore — 社交字段保持空
+      })
+    return () => {
+      active = false
+    }
+  }, [user])
+
+  // 拉取 2FA 状态
+  useEffect(() => {
+    if (!user) return
+    let active = true
+    getTwoFactorStatus()
+      .then((s) => {
+        if (active) setTotpEnabled(s.enabled)
+      })
+      .catch(() => {
+        // ignore
       })
     return () => {
       active = false
@@ -321,6 +345,67 @@ export default function Settings() {
       setPwdError(err instanceof Error ? err.message : '更新失败')
     } finally {
       setPwdSaving(false)
+    }
+  }
+
+  // 2FA：生成密钥
+  async function handleTotpSetup() {
+    setTotpError('')
+    setTotpSuccess('')
+    setTotpCode('')
+    setTotpLoading(true)
+    try {
+      const data = await setupTwoFactor()
+      setTotpSetup(data)
+    } catch (err) {
+      setTotpError(err instanceof Error ? err.message : '生成密钥失败')
+    } finally {
+      setTotpLoading(false)
+    }
+  }
+
+  // 2FA：验证并启用
+  async function handleTotpEnable(e: FormEvent) {
+    e.preventDefault()
+    setTotpError('')
+    setTotpSuccess('')
+    if (!/^\d{6}$/.test(totpCode.trim())) {
+      setTotpError('请输入 6 位验证码')
+      return
+    }
+    setTotpLoading(true)
+    try {
+      const res = await enableTwoFactor(totpCode.trim())
+      setTotpEnabled(true)
+      setTotpSetup(null)
+      setTotpCode('')
+      setTotpSuccess(res.message || '两步验证已开启')
+    } catch (err) {
+      setTotpError(err instanceof Error ? err.message : '验证失败')
+    } finally {
+      setTotpLoading(false)
+    }
+  }
+
+  // 2FA：关闭
+  async function handleTotpDisable(e: FormEvent) {
+    e.preventDefault()
+    setTotpError('')
+    setTotpSuccess('')
+    if (!/^\d{6}$/.test(totpCode.trim())) {
+      setTotpError('请输入 6 位验证码')
+      return
+    }
+    setTotpLoading(true)
+    try {
+      const res = await disableTwoFactor(totpCode.trim())
+      setTotpEnabled(false)
+      setTotpCode('')
+      setTotpSuccess(res.message || '两步验证已关闭')
+    } catch (err) {
+      setTotpError(err instanceof Error ? err.message : '验证失败')
+    } finally {
+      setTotpLoading(false)
     }
   }
 
@@ -817,6 +902,132 @@ export default function Settings() {
             </button>
           </div>
         </form>
+      </div>
+
+      {/* 安全：两步验证 (TOTP) */}
+      <div className="settings__section settings__section--security">
+        <h2 className="settings__section-title">两步验证（2FA）</h2>
+        <p className="settings__section-desc">
+          使用 Google Authenticator、Authy 等验证器 App 生成动态验证码，为账户增加一层额外保护。
+          开启后，登录时除了用户名和密码外，还需要输入验证码。
+        </p>
+
+        {totpError && <div className="form__error">{totpError}</div>}
+        {totpSuccess && <div className="form__success">{totpSuccess}</div>}
+
+        {totpEnabled ? (
+          // 已开启 2FA：显示状态 + 关闭表单
+          <div className="totp-status totp-status--on">
+            <div className="totp-status__badge">
+              <span className="totp-status__dot">●</span> 已开启
+            </div>
+            <p className="totp-status__hint">
+              你的账户已启用两步验证。关闭后需要重新设置才能再次开启。
+            </p>
+            <form onSubmit={handleTotpDisable} className="form">
+              <div className="form__field">
+                <label className="form__label">输入验证码以关闭两步验证</label>
+                <input
+                  className="form__input"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="\d{6}"
+                  maxLength={6}
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="6 位验证码"
+                  disabled={totpLoading}
+                />
+              </div>
+              <div className="form__actions">
+                <button type="submit" className="btn-primary" disabled={totpLoading || totpCode.length !== 6}>
+                  {totpLoading ? '验证中…' : '关闭两步验证'}
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : totpSetup ? (
+          // 设置流程：显示密钥 + 验证码输入
+          <div className="totp-setup">
+            <div className="totp-setup__step">
+              <h3 className="totp-setup__step-title">第 1 步：扫码或手动输入密钥</h3>
+              <p className="totp-setup__step-desc">
+                在验证器 App 中扫描下方二维码，或手动输入密钥。
+              </p>
+              <div className="totp-setup__qr">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpSetup.otpauth_url)}`}
+                  alt="2FA 二维码"
+                  width={200}
+                  height={200}
+                  loading="lazy"
+                />
+              </div>
+              <div className="totp-setup__secret">
+                <label className="form__label">手动输入密钥</label>
+                <code className="totp-setup__secret-code">{totpSetup.secret}</code>
+              </div>
+            </div>
+            <form onSubmit={handleTotpEnable} className="form totp-setup__step">
+              <h3 className="totp-setup__step-title">第 2 步：输入验证码确认</h3>
+              <p className="totp-setup__step-desc">
+                输入验证器 App 上显示的 6 位验证码完成绑定。
+              </p>
+              <div className="form__field">
+                <label className="form__label">验证码</label>
+                <input
+                  className="form__input"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="\d{6}"
+                  maxLength={6}
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="6 位验证码"
+                  disabled={totpLoading}
+                  autoFocus
+                />
+              </div>
+              <div className="form__actions">
+                <button type="submit" className="btn-primary" disabled={totpLoading || totpCode.length !== 6}>
+                  {totpLoading ? '验证中…' : '确认开启'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    setTotpSetup(null)
+                    setTotpCode('')
+                    setTotpError('')
+                  }}
+                  disabled={totpLoading}
+                >
+                  取消
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : (
+          // 未开启 2FA：显示开启按钮
+          <div className="totp-status totp-status--off">
+            <div className="totp-status__badge totp-status__badge--off">
+              <span className="totp-status__dot">●</span> 未开启
+            </div>
+            <p className="totp-status__hint">
+              开启两步验证后，即使密码泄露，他人也无法登录你的账户。
+            </p>
+            <div className="form__actions">
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleTotpSetup}
+                disabled={totpLoading}
+              >
+                {totpLoading ? '生成中…' : '开启两步验证'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {success && (

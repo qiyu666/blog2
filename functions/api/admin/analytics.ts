@@ -5,6 +5,29 @@ import { json, error } from '../_helpers'
 import { getSession } from '../_auth'
 import { enforceAdminRateLimit } from '../_rate-limit'
 
+async function ensurePostViewsTable(db: D1Database): Promise<void> {
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS post_views (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        post_id INTEGER NOT NULL,
+        visitor_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`
+    )
+    .run()
+  await db
+    .prepare(
+      `CREATE INDEX IF NOT EXISTS idx_post_views_post_created ON post_views(post_id, created_at)`
+    )
+    .run()
+  await db
+    .prepare(
+      `CREATE INDEX IF NOT EXISTS idx_post_views_post_visitor ON post_views(post_id, visitor_hash, created_at)`
+    )
+    .run()
+}
+
 export async function onRequestGet(context: {
   request: Request
   env: { DB: D1Database }
@@ -20,6 +43,9 @@ export async function onRequestGet(context: {
   const authLimit = await enforceAdminRateLimit(env.DB, request, true)
   if (authLimit) return authLimit
 
+  // 确保 post_views 表存在（首次访问时创建）
+  await ensurePostViewsTable(env.DB)
+
   try {
     // Run all queries in parallel for lower latency.
     const [
@@ -33,6 +59,9 @@ export async function onRequestGet(context: {
       trends7dRaw,
       userGrowth30dRaw,
       usersBefore30d,
+      pvUvTotal,
+      topViewedPosts,
+      pvTrend30dRaw,
     ] = await Promise.all([
       env.DB
         .prepare(
@@ -168,6 +197,41 @@ export async function onRequestGet(context: {
       env.DB
         .prepare(`SELECT COUNT(*) AS c FROM users WHERE created_at < date('now', '-30 days')`)
         .first<{ c: number }>(),
+      // 总 PV / UV（所有文章合计）
+      Promise.all([
+        env.DB.prepare('SELECT COUNT(*) AS c FROM post_views').first<{ c: number }>(),
+        env.DB
+          .prepare('SELECT COUNT(DISTINCT visitor_hash) AS c FROM post_views')
+          .first<{ c: number }>(),
+      ]).then(([pv, uv]) => ({
+        totalPV: pv?.c || 0,
+        totalUV: uv?.c || 0,
+      })),
+      // 浏览量 Top 10 文章（基于 post_views）
+      env.DB
+        .prepare(
+          `SELECT p.id, p.title, p.slug, p.category,
+             COUNT(pv.id) AS pv,
+             COUNT(DISTINCT pv.visitor_hash) AS uv,
+             p.views AS legacy_views
+           FROM posts p
+           LEFT JOIN post_views pv ON pv.post_id = p.id
+           WHERE p.published = 1
+           GROUP BY p.id
+           ORDER BY pv DESC
+           LIMIT 10`
+        )
+        .all(),
+      // 近 30 天每日 PV 趋势
+      env.DB
+        .prepare(
+          `SELECT date(created_at) AS date, COUNT(*) AS pv, COUNT(DISTINCT visitor_hash) AS uv
+           FROM post_views
+           WHERE created_at >= date('now', '-30 days')
+           GROUP BY date(created_at)
+           ORDER BY date ASC`
+        )
+        .all(),
     ])
 
     // ===== 后处理：构建 7 天趋势（补齐空日期） =====
@@ -205,6 +269,20 @@ export async function onRequestGet(context: {
       return { date, daily_count, cumulative }
     })
 
+    // ===== 后处理：构建近 30 天 PV/UV 趋势（补齐空日期） =====
+    const pvTrend30dMap = new Map<string, { pv: number; uv: number }>()
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now)
+      d.setUTCDate(d.getUTCDate() - i)
+      pvTrend30dMap.set(d.toISOString().slice(0, 10), { pv: 0, uv: 0 })
+    }
+    for (const r of (pvTrend30dRaw.results as any[])) {
+      if (pvTrend30dMap.has(r.date)) {
+        pvTrend30dMap.set(r.date, { pv: r.pv || 0, uv: r.uv || 0 })
+      }
+    }
+    const pvTrend30d = Array.from(pvTrend30dMap.entries()).map(([date, v]) => ({ date, ...v }))
+
     return json({
       userGrowth: userGrowth.results,
       postGrowth: postGrowth.results,
@@ -215,6 +293,9 @@ export async function onRequestGet(context: {
       overview,
       trends7d,
       userGrowth30d,
+      pvUv: pvUvTotal,
+      topViewedPosts: topViewedPosts.results,
+      pvTrend30d,
     })
   } catch (err) {
     return error('Failed to fetch analytics: ' + String(err), 500)

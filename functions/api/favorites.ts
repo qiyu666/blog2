@@ -4,6 +4,15 @@
 import { json, error } from './_helpers'
 import { getSession } from './_auth'
 
+/** 确保 favorites 表有 collection_id 列（用于收藏夹分组） */
+async function ensureCollectionIdColumn(db: D1Database): Promise<void> {
+  try {
+    await db.prepare('ALTER TABLE favorites ADD COLUMN collection_id INTEGER').run()
+  } catch {
+    // 列已存在
+  }
+}
+
 export async function onRequestGet(context: {
   request: Request
   env: { DB: D1Database }
@@ -12,9 +21,12 @@ export async function onRequestGet(context: {
   const { user } = await getSession(request, env.DB)
   if (!user) return error('请先登录', 401)
 
+  await ensureCollectionIdColumn(env.DB)
+
   try {
     const result = await env.DB.prepare(
-      `SELECT p.id, p.title, p.slug, p.excerpt, p.author, p.category, p.cover_image,
+      `SELECT f.id AS favorite_id, f.collection_id,
+        p.id, p.title, p.slug, p.excerpt, p.author, p.category, p.cover_image,
         p.created_at, p.views, u.username AS author_username,
         f.created_at AS favorited_at,
         (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS likes_count,

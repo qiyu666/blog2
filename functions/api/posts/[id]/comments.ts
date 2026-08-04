@@ -1,6 +1,6 @@
 // /api/posts/[id]/comments
-// GET  → list comments for a post
-// POST → create a comment (requires login)
+// GET  → list comments for a post (public sees only 'approved'; admin/author sees all)
+// POST → create a comment (requires login) — runs spam check, may set status='pending'|'spam'
 
 import { json, error } from '../../_helpers'
 import { getSession, cleanText } from '../../_auth'
@@ -16,6 +16,45 @@ async function resolvePostId(db: D1Database, idParam: string): Promise<number | 
   return row?.id ?? null
 }
 
+/** 确保 comments 表有 status 列（兼容旧库）。 */
+async function ensureCommentsStatusColumn(db: D1Database): Promise<void> {
+  try {
+    await db.prepare(`ALTER TABLE comments ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'`).run()
+  } catch (err) {
+    if (!String(err).includes('duplicate column')) {
+      throw err
+    }
+  }
+}
+
+/**
+ * 简易垃圾评论检测：
+ *  - 链接数 > 3
+ *  - 大段全大写英文（≥ 20 字符且字母中大写占比 ≥ 80%）
+ *  - 连续重复字符 ≥ 15（如 aaaaaaaaaaaaaaa）
+ *  - 内容过短且仅为链接
+ * 命中任一条 → 'spam'；否则返回 'approved'。
+ */
+function detectSpam(content: string): boolean {
+  if (!content) return false
+  // 链接数（http(s):// 或 www.）
+  const linkCount = (content.match(/https?:\/\/\S+/gi) || []).length
+    + (content.match(/\bwww\.\S+/gi) || []).length
+  if (linkCount > 3) return true
+
+  // 全大写英文段
+  const letters = content.replace(/[^a-zA-Z]/g, '')
+  if (letters.length >= 20) {
+    const upper = letters.replace(/[^A-Z]/g, '').length
+    if (upper / letters.length >= 0.8) return true
+  }
+
+  // 连续重复字符（同一字符出现 ≥ 15 次）
+  if (/(.)\1{14,}/.test(content)) return true
+
+  return false
+}
+
 export async function onRequestGet(context: {
   request: Request
   params: { id: string }
@@ -29,17 +68,33 @@ export async function onRequestGet(context: {
 
   const { user } = await getSession(request, DB)
 
+  // 判断当前用户是否可看全部状态（管理员或帖子作者）
+  let canSeeAll = false
+  if (user) {
+    if (user.role === 'admin') {
+      canSeeAll = true
+    } else {
+      const post = await DB.prepare('SELECT author_id FROM posts WHERE id = ?')
+        .bind(postId)
+        .first<{ author_id: number | null }>()
+      if (post?.author_id === user.id) canSeeAll = true
+    }
+  }
+
+  await ensureCommentsStatusColumn(DB)
+
   try {
     // likes_count 始终查询；liked 仅在登录时查询（当前用户是否点赞）
     const likedSubquery = user
       ? `, (SELECT COUNT(*) FROM comment_likes cl WHERE cl.comment_id = c.id AND cl.user_id = ?) AS liked`
       : ''
-    const query = `SELECT c.id, c.post_id, c.user_id, c.parent_id, c.content, c.created_at,
+    const statusClause = canSeeAll ? '' : `AND c.status = 'approved'`
+    const query = `SELECT c.id, c.post_id, c.user_id, c.parent_id, c.content, c.created_at, c.status,
         u.username AS author_username, u.avatar AS author_avatar,
         (SELECT COUNT(*) FROM comment_likes cl WHERE cl.comment_id = c.id) AS likes_count${likedSubquery}
        FROM comments c
        JOIN users u ON c.user_id = u.id
-       WHERE c.post_id = ?
+       WHERE c.post_id = ? ${statusClause}
        ORDER BY c.created_at ASC`
     const stmt = user
       ? DB.prepare(query).bind(user.id, postId)
@@ -88,17 +143,22 @@ export async function onRequestPost(context: {
     if (!parent) return error('父评论不存在', 400)
   }
 
+  await ensureCommentsStatusColumn(env.DB)
+
+  // 垃圾检测：命中则标记为 spam，否则默认 approved
+  const status = detectSpam(content) ? 'spam' : 'approved'
+
   try {
     const result = await env.DB
       .prepare(
-        'INSERT INTO comments (post_id, user_id, parent_id, content) VALUES (?, ?, ?, ?)'
+        'INSERT INTO comments (post_id, user_id, parent_id, content, status) VALUES (?, ?, ?, ?, ?)'
       )
-      .bind(postId, user.id, parentId, content)
+      .bind(postId, user.id, parentId, content, status)
       .run()
     const commentId = result.meta.last_row_id as number
     const comment = await env.DB
       .prepare(
-        `SELECT c.id, c.post_id, c.user_id, c.parent_id, c.content, c.created_at,
+        `SELECT c.id, c.post_id, c.user_id, c.parent_id, c.content, c.created_at, c.status,
           u.username AS author_username, u.avatar AS author_avatar
          FROM comments c JOIN users u ON c.user_id = u.id
          WHERE c.id = ?`
@@ -106,58 +166,61 @@ export async function onRequestPost(context: {
       .bind(commentId)
       .first()
 
-    // ---- 通知 ----
-    // 1. 通知帖子作者有人评论了他的帖子
-    const postOwner = await env.DB
-      .prepare('SELECT author_id FROM posts WHERE id = ?')
-      .bind(postId)
-      .first<{ author_id: number | null }>()
-    if (postOwner?.author_id) {
-      void notify({
-        db: env.DB,
-        userId: postOwner.author_id,
-        actorId: user.id,
-        type: 'post_comment',
-        postId,
-        commentId,
-      })
-    }
-    // 2. 如果是回复，通知被回复者
-    if (parentId) {
-      const parent = await env.DB
-        .prepare('SELECT user_id FROM comments WHERE id = ?')
-        .bind(parentId)
-        .first<{ user_id: number }>()
-      if (parent?.user_id) {
+    // 垃圾评论不触发通知，避免污染作者收件箱
+    if (status !== 'spam') {
+      // ---- 通知 ----
+      // 1. 通知帖子作者有人评论了他的帖子
+      const postOwner = await env.DB
+        .prepare('SELECT author_id FROM posts WHERE id = ?')
+        .bind(postId)
+        .first<{ author_id: number | null }>()
+      if (postOwner?.author_id) {
         void notify({
           db: env.DB,
-          userId: parent.user_id,
+          userId: postOwner.author_id,
           actorId: user.id,
-          type: 'comment_reply',
+          type: 'post_comment',
           postId,
           commentId,
         })
       }
-    }
+      // 2. 如果是回复，通知被回复者
+      if (parentId) {
+        const parent = await env.DB
+          .prepare('SELECT user_id FROM comments WHERE id = ?')
+          .bind(parentId)
+          .first<{ user_id: number }>()
+        if (parent?.user_id) {
+          void notify({
+            db: env.DB,
+            userId: parent.user_id,
+            actorId: user.id,
+            type: 'comment_reply',
+            postId,
+            commentId,
+          })
+        }
+      }
 
-    // 3. 解析 @mentions 并通知被提及的用户
-    const mentions = content.match(/@([a-zA-Z0-9_]{3,20})/g) || []
-    const uniqueMentions = [...new Set(mentions.map(m => m.slice(1)))]
-    for (const mentionedUsername of uniqueMentions) {
-      if (mentionedUsername === user.username) continue
-      const mentionedUser = await env.DB
-        .prepare('SELECT id FROM users WHERE username = ?')
-        .bind(mentionedUsername)
-        .first<{ id: number }>()
-      if (mentionedUser) {
-        void notify({
-          db: env.DB,
-          userId: mentionedUser.id,
-          actorId: user.id,
-          type: 'system',
-          postId,
-          commentId,
-        })
+      // 3. 解析 @mentions 并通知被提及的用户
+      const mentions = content.match(/@([a-zA-Z0-9_]{3,20})/g) || []
+      const uniqueMentions = [...new Set(mentions.map(m => m.slice(1)))]
+      for (const mentionedUsername of uniqueMentions) {
+        if (mentionedUsername === user.username) continue
+        const mentionedUser = await env.DB
+          .prepare('SELECT id FROM users WHERE username = ?')
+          .bind(mentionedUsername)
+          .first<{ id: number }>()
+        if (mentionedUser) {
+          void notify({
+            db: env.DB,
+            userId: mentionedUser.id,
+            actorId: user.id,
+            type: 'system',
+            postId,
+            commentId,
+          })
+        }
       }
     }
 

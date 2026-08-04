@@ -21,6 +21,21 @@ export interface LoginResult {
 
 const API_BASE: string = (import.meta.env.VITE_API_BASE as string) || ''
 
+/**
+ * 估算阅读时长（分钟）。
+ * 中文字符按 1 个字计算，英文按空格分词；总词数除以 200 wpm 后向上取整，最小 1 分钟。
+ */
+export function estimateReadingTime(content: string): number {
+  if (!content) return 1
+  // 中文字符数（CJK 统一表意文字 + 兼容表意文字 + 全角标点不算字数）
+  const chineseChars = (content.match(/[\u4e00-\u9fff]/g) || []).length
+  // 移除中文字符后，按空白分词统计英文单词数
+  const nonChinese = content.replace(/[\u4e00-\u9fff]/g, ' ')
+  const englishWords = nonChinese.split(/\s+/).filter(Boolean).length
+  const totalWords = chineseChars + englishWords
+  return Math.max(1, Math.ceil(totalWords / 200))
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const fullUrl = API_BASE + url
   const res = await fetch(fullUrl, {
@@ -64,6 +79,21 @@ export interface PostNeighbor {
 
 export async function getPostNeighbors(slug: string): Promise<{ previous: PostNeighbor | null; next: PostNeighbor | null }> {
   return request(`/api/posts/${slug}/neighbors`);
+}
+
+export interface RelatedPost {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string;
+  cover_image: string;
+  category: string;
+  created_at: string;
+}
+
+// 相关文章推荐：基于共享标签与同分类
+export async function getRelatedPosts(slug: string): Promise<RelatedPost[]> {
+  return request<RelatedPost[]>(`/api/posts/${slug}/related`);
 }
 
 export async function createPost(data: PostInput): Promise<Post> {
@@ -230,8 +260,103 @@ export async function toggleFavorite(
   });
 }
 
-export async function getFavorites(): Promise<Post[]> {
+export async function getFavorites(): Promise<Array<Post & { collection_id?: number | null; favorited_at?: string }>> {
   return request<Post[]>('/api/favorites');
+}
+
+// ===== 收藏夹（Collection 文件夹） =====
+export interface FavoriteCollection {
+  id: number;
+  name: string;
+  count: number;
+}
+
+export async function getFavoriteCollections(): Promise<FavoriteCollection[]> {
+  return request<FavoriteCollection[]>('/api/favorites/collections');
+}
+
+export async function createFavoriteCollection(name: string): Promise<FavoriteCollection> {
+  return request<FavoriteCollection>('/api/favorites/collections', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function renameFavoriteCollection(
+  id: number,
+  name: string
+): Promise<FavoriteCollection> {
+  return request<FavoriteCollection>(`/api/favorites/collections?id=${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function deleteFavoriteCollection(id: number): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/api/favorites/collections?id=${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/** 移动某条收藏到指定 collection（collection_id=null 表示移到默认收藏） */
+export async function moveFavorite(
+  favoriteId: number,
+  collectionId: number | null
+): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/api/favorites/${favoriteId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ collection_id: collectionId }),
+  });
+}
+
+// ===== 草稿分享链接 =====
+export interface ShareLinkResult {
+  token: string;
+  share_url: string;
+  expires_at: string;
+  id: number | null;
+}
+
+export async function createShareLink(postId: number | string): Promise<ShareLinkResult> {
+  return request<ShareLinkResult>(`/api/posts/${postId}/share-link`, {
+    method: 'POST',
+  });
+}
+
+export async function revokeShareLink(
+  postId: number | string,
+  token?: string
+): Promise<{ success: boolean }> {
+  const qs = token ? `?token=${encodeURIComponent(token)}` : '';
+  return request<{ success: boolean }>(`/api/posts/${postId}/share-link${qs}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function getSharedPost(
+  postId: number | string,
+  token: string
+): Promise<{ post: Post; is_share_preview: boolean; expires_at: string }> {
+  return request(`/api/posts/${postId}/share-link?token=${encodeURIComponent(token)}`);
+}
+
+/** /share/:token 公开页面用的读取接口（无需 postId，后端按 token 反查） */
+export async function getSharedPostByToken(
+  token: string
+): Promise<{ post: Post; is_share_preview: boolean; expires_at: string }> {
+  const API_BASE: string = (import.meta.env.VITE_API_BASE as string) || '';
+  const res = await fetch(`${API_BASE}/api/posts/0/share-link?token=${encodeURIComponent(token)}`, {
+    credentials: 'same-origin',
+  });
+  if (!res.ok) {
+    let msg = `Request failed: ${res.status}`;
+    try {
+      const data = await res.json();
+      msg = data.error || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
 }
 
 // ===== Messages (站内信) =====
@@ -407,6 +532,17 @@ export interface AnalyticsData {
   };
   trends7d?: Array<{ date: string; posts: number; users: number; comments: number }>;
   userGrowth30d?: Array<{ date: string; daily_count: number; cumulative: number }>;
+  pvUv?: { totalPV: number; totalUV: number };
+  topViewedPosts?: Array<{
+    id: number;
+    title: string;
+    slug: string;
+    category: string;
+    pv: number;
+    uv: number;
+    legacy_views: number;
+  }>;
+  pvTrend30d?: Array<{ date: string; pv: number; uv: number }>;
 }
 
 export async function getAnalytics(): Promise<AnalyticsData> {
@@ -450,6 +586,24 @@ export interface ProfileUpdate {
 
 export async function getUserProfile(username: string): Promise<UserProfile> {
   return request<UserProfile>(`/api/users/${encodeURIComponent(username)}`);
+}
+
+// ===== 用户活动时间线 =====
+export type ActivityType = 'post' | 'comment' | 'like' | 'favorite';
+
+export interface ActivityItem {
+  type: ActivityType;
+  target_id: number;
+  target_title: string;
+  target_slug: string;
+  created_at: string;
+}
+
+export async function getUserActivity(username: string): Promise<ActivityItem[]> {
+  const data = await request<{ activities: ActivityItem[] }>(
+    `/api/users/${encodeURIComponent(username)}/activity`
+  );
+  return data.activities;
 }
 
 export async function updateProfile(
@@ -811,4 +965,96 @@ export async function deleteCategory(id: number): Promise<{ success: boolean; id
   return request(`/api/admin/categories?id=${id}`, {
     method: 'DELETE',
   });
+}
+
+// ===== 数据导入/导出 =====
+export interface ImportResult {
+  success: boolean;
+  imported: number;
+  skipped: number;
+  total: number;
+  errors?: string[];
+}
+
+/** 触发浏览器下载：导出文章为 JSON 或 Markdown */
+export async function exportPosts(format: 'json' | 'markdown'): Promise<void> {
+  const res = await fetch(`/api/admin/export?format=${encodeURIComponent(format)}`, {
+    credentials: 'same-origin',
+  });
+  if (!res.ok) {
+    let msg = `导出失败: ${res.status}`;
+    try {
+      const data = await res.json();
+      msg = data.error || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  const blob = await res.blob();
+  const stamp = new Date().toISOString().slice(0, 10);
+  const ext = format === 'markdown' ? 'md' : 'json';
+  const filename = `posts-${stamp}.${ext}`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** 导入文章（接受数组或 { posts: [...] }） */
+export async function importPosts(data: unknown): Promise<ImportResult> {
+  return request<ImportResult>('/api/admin/import', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+// ===== 评论审核 =====
+export interface AdminCommentWithStatus extends AdminComment {
+  status?: string;
+}
+
+export async function getAdminPendingComments(): Promise<AdminCommentWithStatus[]> {
+  return request<AdminCommentWithStatus[]>('/api/admin/comments?status=pending');
+}
+
+export async function moderateComment(
+  id: number,
+  action: 'approve' | 'reject' | 'spam'
+): Promise<{ success: boolean; id: number; status: string }> {
+  return request(`/api/admin/comments?id=${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ id, action }),
+  });
+}
+
+// ===== 文章访问统计（PV/UV） =====
+export interface PostStats {
+  pv: number;
+  uv: number;
+}
+
+/** 上报一次访问（前端在 PostDetail 加载时调用） */
+export async function recordPostView(postId: number | string): Promise<void> {
+  try {
+    await fetch('/api/stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ post_id: postId }),
+    });
+  } catch {
+    // 静默失败：统计不应影响阅读体验
+  }
+}
+
+/** 获取某篇文章的 PV/UV（作者或管理员） */
+export async function getPostStats(slug: string): Promise<PostStats | null> {
+  try {
+    return await request<PostStats>(`/api/posts/${slug}/stats`);
+  } catch {
+    return null;
+  }
 }

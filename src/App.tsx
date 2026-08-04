@@ -37,6 +37,7 @@ const SeriesDetail = lazy(() => import('./pages/SeriesDetail'))
 const SeriesManage = lazy(() => import('./pages/SeriesManage'))
 const Links = lazy(() => import('./pages/Links'))
 const Unsubscribe = lazy(() => import('./pages/Unsubscribe'))
+const SharedPost = lazy(() => import('./pages/SharedPost'))
 
 export default function App() {
   return (
@@ -45,6 +46,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/post/:slug" element={<PostDetail />} />
+          <Route path="/share/:token" element={<SharedPost />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/search" element={<Search />} />

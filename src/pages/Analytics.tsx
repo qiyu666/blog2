@@ -88,6 +88,8 @@ export default function Analytics() {
     { label: '总评论', value: o.comments, icon: '💬', color: 'var(--gold)' },
     { label: '总点赞', value: o.likes, icon: '♥', color: '#ec4899' },
     { label: '总浏览', value: o.views, icon: '👁', color: '#6366f1' },
+    { label: '总 PV', value: data.pvUv?.totalPV ?? 0, icon: '📊', color: '#0ea5e9' },
+    { label: '总 UV', value: data.pvUv?.totalUV ?? 0, icon: '🌐', color: '#8b5cf6' },
     { label: '待处理举报', value: o.pendingReports, icon: '⚑', color: '#b91c1c' },
   ]
 
@@ -274,6 +276,46 @@ export default function Analytics() {
       {data.userGrowth30d && data.userGrowth30d.length > 0 && (
         <UserGrowthCumulative data={data.userGrowth30d} />
       )}
+
+      {/* 浏览量 Top 10 文章（基于 PV/UV） */}
+      {data.topViewedPosts && data.topViewedPosts.length > 0 && (
+        <section className="analytics-section">
+          <h2 className="analytics-section__title">浏览量 Top 10 文章（PV/UV）</h2>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>标题</th>
+                  <th>分类</th>
+                  <th>PV</th>
+                  <th>UV</th>
+                  <th>旧浏览</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.topViewedPosts.map((p, i) => (
+                  <tr key={p.id}>
+                    <td className="admin-table__num">{i + 1}</td>
+                    <td className="admin-table__title">
+                      <Link to={`/post/${p.slug}`}>{p.title}</Link>
+                    </td>
+                    <td className="admin-table__num">{p.category}</td>
+                    <td className="admin-table__num">{formatNumber(p.pv)}</td>
+                    <td className="admin-table__num">{formatNumber(p.uv)}</td>
+                    <td className="admin-table__num">{formatNumber(p.legacy_views)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* 近 30 天 PV/UV 趋势 */}
+      {data.pvTrend30d && data.pvTrend30d.length > 0 && (
+        <PvUvTrendChart data={data.pvTrend30d} />
+      )}
     </div>
   )
 }
@@ -415,6 +457,89 @@ function UserGrowthCumulative({
             style={{ height: `${(d.cumulative / maxCum) * 100}%` }}
             data-value={`${formatDay(d.date)}：累计 ${d.cumulative}`}
           />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/** 近 30 天 PV/UV 趋势折线图（纯 SVG，双线：PV/UV） */
+function PvUvTrendChart({
+  data,
+}: {
+  data: Array<{ date: string; pv: number; uv: number }>
+}) {
+  const width = 640
+  const height = 200
+  const padding = { top: 16, right: 16, bottom: 28, left: 36 }
+  const innerW = width - padding.left - padding.right
+  const innerH = height - padding.top - padding.bottom
+
+  const maxVal = Math.max(1, ...data.flatMap((d) => [d.pv, d.uv]))
+  const stepX = data.length > 1 ? innerW / (data.length - 1) : innerW
+
+  const buildPoints = (key: 'pv' | 'uv') =>
+    data
+      .map((d, i) => {
+        const x = padding.left + i * stepX
+        const y = padding.top + innerH - (d[key] / maxVal) * innerH
+        return `${x},${y}`
+      })
+      .join(' ')
+
+  const lines = [
+    { key: 'pv' as const, color: '#0ea5e9', label: 'PV' },
+    { key: 'uv' as const, color: '#8b5cf6', label: 'UV' },
+  ]
+
+  const totalPV = data.reduce((s, d) => s + d.pv, 0)
+  const totalUV = data.reduce((s, d) => s + d.uv, 0)
+
+  return (
+    <section className="analytics-trends">
+      <h2 className="analytics-section__title">近 30 天 PV/UV 趋势</h2>
+      <div className="analytics-trends__summary">
+        <span>区间 PV 合计 {formatNumber(totalPV)}</span>
+        <span>区间 UV 合计 {formatNumber(totalUV)}</span>
+      </div>
+      <div className="analytics-trends__chart">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
+          style={{ width: '100%', height: '100%' }}
+        >
+          {[0, 0.25, 0.5, 0.75, 1].map((p) => (
+            <line
+              key={p}
+              x1={padding.left}
+              x2={width - padding.right}
+              y1={padding.top + innerH * p}
+              y2={padding.top + innerH * p}
+              stroke="var(--line-soft)"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {lines.map((l) => (
+            <polyline
+              key={l.key}
+              className="analytics-trends__line"
+              points={buildPoints(l.key)}
+              style={{ stroke: l.color }}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        </svg>
+      </div>
+      <div className="analytics-trends__legend">
+        {lines.map((l) => (
+          <div key={l.key} className="analytics-trends__legend-item">
+            <span
+              className="analytics-trends__legend-dot"
+              style={{ background: l.color }}
+            />
+            {l.label}
+          </div>
         ))}
       </div>
     </section>
