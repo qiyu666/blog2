@@ -40,10 +40,15 @@ import SEO from '../components/SEO'
 import PostSidebar from '../components/PostSidebar'
 import TableOfContents from '../components/TableOfContents'
 import SocialLinks from '../components/SocialLinks'
+import RevisionHistory from '../components/RevisionHistory'
 import DOMPurify from 'dompurify'
 
 /** Minimal markdown → HTML renderer (headings, lists, code, blockquote, bold, italic) */
-function renderMarkdown(md: string): string {
+function renderMarkdown(
+  md: string,
+  options: { images?: boolean; mentions?: boolean } = {},
+): string {
+  const { images = true, mentions = false } = options
   const lines = md.split('\n')
   let html = ''
   let inList = false
@@ -83,14 +88,25 @@ function renderMarkdown(md: string): string {
       return `\x00PLACEHOLDER_${placeholders.length - 1}\x00`
     }
     let processed = text
-      // ![alt](url)
-      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) =>
-        stash(`<img src="${url}" alt="${alt}" loading="lazy" style="max-width:100%;border-radius:8px;margin:0.5rem 0;" />`),
-      )
+    // ![alt](url) — 仅文章正文允许图片，评论中禁用
+    if (images) {
+      processed = processed
+        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) =>
+          stash(`<img src="${url}" alt="${alt}" loading="lazy" style="max-width:100%;border-radius:8px;margin:0.5rem 0;" />`),
+        )
+    }
+    processed = processed
       // [text](url)
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) =>
         stash(`<a href="${url}" target="_blank" rel="noreferrer noopener">${label}</a>`),
       )
+    // 评论 @username 提及 → 可点击链接（在转义之前 stash，避免被破坏；代码块不走 inline，故不受影响）
+    if (mentions) {
+      processed = processed.replace(
+        /(?<![a-zA-Z0-9_])@([a-zA-Z0-9_]{3,20})/g,
+        (_, username) => stash(`<a href="/${username}" class="mention">@${username}</a>`),
+      )
+    }
     // 第 2 步：转义剩余的 HTML 特殊字符和行内格式
     processed = processed
       .replace(/&/g, '&amp;')
@@ -166,7 +182,10 @@ function renderMarkdown(md: string): string {
   if (inList) html += '</ul>\n'
   if (inCode) html += `<pre class="code-block"><code class="language-${codeLang || 'text'}">${codeBuffer.join('\n').replace(/</g, '&lt;')}</code></pre>\n`
   // 用 DOMPurify 过滤 XSS：移除 javascript: 协议链接、事件处理器等危险内容
-  return DOMPurify.sanitize(html, { ADD_ATTR: ['target', 'rel'] })
+  return DOMPurify.sanitize(html, {
+    ADD_ATTR: ['target', 'rel', 'class'],
+    FORBID_TAGS: images ? [] : ['img'],
+  })
 }
 
 /** 从 markdown 内容提取标题，用于生成 TOC */
@@ -219,20 +238,11 @@ function formatRelative(dateStr: string): string {
   return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
 
-/** Render comment content, converting @username mentions into clickable Links. */
-function renderCommentContent(content: string) {
-  const parts = content.split(/(@[a-zA-Z0-9_]{3,20})/g)
-  return parts.map((part, i) => {
-    if (part.startsWith('@') && part.length > 1) {
-      const username = part.slice(1)
-      return (
-        <Link key={i} to={`/${username}`} className="mention">
-          {part}
-        </Link>
-      )
-    }
-    return <span key={i}>{part}</span>
-  })
+/** Render comment content as sanitized Markdown HTML.
+ *  Supports bold/italic/inline code/code blocks/links/lists/blockquotes (no images),
+ *  and converts @username mentions into clickable internal links. */
+function renderCommentContent(content: string): string {
+  return renderMarkdown(content, { images: false, mentions: true })
 }
 
 export default function PostDetail() {
@@ -244,6 +254,8 @@ export default function PostDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [toc, setToc] = useState<Array<{ level: number; text: string; id: string }>>([])
+  // 移动端目录抽屉开关
+  const [mobileTocOpen, setMobileTocOpen] = useState(false)
 
   const [comments, setComments] = useState<Comment[]>([])
   const [commentText, setCommentText] = useState('')
@@ -297,6 +309,9 @@ export default function PostDetail() {
 
   // 上一篇/下一篇导航
   const [neighbors, setNeighbors] = useState<{ previous: PostNeighbor | null; next: PostNeighbor | null }>({ previous: null, next: null })
+
+  // 历史版本弹窗
+  const [showRevisions, setShowRevisions] = useState(false)
 
   const loadPost = useCallback(() => {
     if (!slug) return
@@ -845,7 +860,19 @@ export default function PostDetail() {
                 </div>
               </div>
             ) : (
-              <p className="comment__content">{renderCommentContent(c.content)}</p>
+              <div
+                className="comment__content comment__content--md"
+                dangerouslySetInnerHTML={{ __html: renderCommentContent(c.content) }}
+                onClick={(e) => {
+                  const anchor = (e.target as HTMLElement).closest('a')
+                  if (!anchor) return
+                  const href = anchor.getAttribute('href')
+                  if (href && href.startsWith('/') && !href.startsWith('//')) {
+                    e.preventDefault()
+                    navigate(href)
+                  }
+                }}
+              />
             )}
           </div>
           {!isCollapsed && (
@@ -1082,6 +1109,14 @@ export default function PostDetail() {
                 <Link to={`/edit/${post.id}`} className="btn-edit">
                   编辑
                 </Link>
+                <button
+                  type="button"
+                  className="btn-edit"
+                  onClick={() => setShowRevisions(true)}
+                  title="查看历史版本"
+                >
+                  历史版本
+                </button>
                 <button onClick={handleDelete} className="btn-delete">
                   删除
                 </button>
@@ -1223,6 +1258,56 @@ export default function PostDetail() {
         </aside>
       )}
     </div>
+    {/* 移动端目录浮动按钮 + 左侧抽屉（桌面端隐藏） */}
+    {toc.length >= 2 && (
+      <>
+        <button
+          type="button"
+          className="mobile-toc-btn"
+          onClick={() => setMobileTocOpen(true)}
+          aria-label="打开目录"
+          title="目录"
+        >
+          <span className="mobile-toc-btn__icon" aria-hidden="true">☰</span>
+        </button>
+        {mobileTocOpen && (
+          <>
+            <div
+              className="mobile-toc-overlay"
+              onClick={() => setMobileTocOpen(false)}
+            />
+            <aside
+              className="mobile-toc-drawer"
+              aria-label="文章目录"
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest('a')) setMobileTocOpen(false)
+              }}
+            >
+              <div className="mobile-toc-drawer__header">
+                <span className="mobile-toc-drawer__title">目录</span>
+                <button
+                  type="button"
+                  className="mobile-toc-drawer__close"
+                  onClick={() => setMobileTocOpen(false)}
+                  aria-label="关闭目录"
+                >
+                  ✕
+                </button>
+              </div>
+              <TableOfContents items={toc} />
+            </aside>
+          </>
+        )}
+      </>
+    )}
+    {canEdit && (
+      <RevisionHistory
+        postId={post.id}
+        open={showRevisions}
+        onClose={() => setShowRevisions(false)}
+        onRestored={() => loadPost()}
+      />
+    )}
     </>
   )
 }

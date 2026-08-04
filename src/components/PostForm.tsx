@@ -128,6 +128,116 @@ function calcStats(text: string) {
   return { cnChars, enWords, total, minutes }
 }
 
+/** 简单 YAML 行解析：支持 "key: value" 与 "key: [a, b]" / "key: \"a\"" */
+function parseYamlLine(line: string): { key: string; value: string } | null {
+  const match = line.match(/^([A-Za-z_][\w-]*)\s*:\s*(.*)$/)
+  if (!match) return null
+  const key = match[1].trim()
+  let value = match[2].trim()
+  // 数组形式 [a, b, c]
+  if (value.startsWith('[') && value.endsWith(']')) {
+    value = value.slice(1, -1)
+  }
+  // 去除首尾引号
+  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    value = value.slice(1, -1)
+  }
+  return { key, value }
+}
+
+interface ParsedMarkdown {
+  title?: string
+  category?: string
+  tags?: string
+  excerpt?: string
+  content: string
+}
+
+/** 解析导入的 Markdown：识别 frontmatter 或首个 H1 */
+function parseImportedMarkdown(raw: string): ParsedMarkdown {
+  const text = raw.replace(/\r\n/g, '\n')
+  const result: ParsedMarkdown = { content: '' }
+
+  // Frontmatter: 文件以 --- 开始
+  if (text.startsWith('---')) {
+    const endMatch = text.indexOf('\n---', 3)
+    if (endMatch !== -1) {
+      const yamlBlock = text.slice(3, endMatch).trim()
+      // body 跳过结束的 --- 行
+      let body = text.slice(endMatch + 4)
+      if (body.startsWith('\n')) body = body.slice(1)
+      result.content = body.trimStart()
+
+      const lines = yamlBlock.split('\n')
+      for (const line of lines) {
+        const parsed = parseYamlLine(line)
+        if (!parsed) continue
+        const { key, value } = parsed
+        const lower = key.toLowerCase()
+        if (lower === 'title') result.title = value
+        else if (lower === 'category' || lower === 'categories') result.category = value
+        else if (lower === 'tags' || lower === 'tag') result.tags = value
+        else if (lower === 'excerpt' || lower === 'description') result.excerpt = value
+      }
+      return result
+    }
+  }
+
+  // 无 frontmatter：尝试用首个 H1 作为标题
+  const lines = text.split('\n')
+  let title: string | undefined
+  let bodyStart = 0
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const h1 = line.match(/^#\s+(.+?)\s*$/)
+    if (h1) {
+      title = h1[1].trim()
+      bodyStart = i + 1
+      break
+    }
+    // 遇到非空非 H1 行则停止寻找
+    if (line.trim() !== '') break
+  }
+  if (title) {
+    result.title = title
+    result.content = lines.slice(bodyStart).join('\n').trimStart()
+  } else {
+    result.content = text
+  }
+  return result
+}
+
+/** 生成导出用的 Markdown 文本 */
+function buildExportMarkdown(form: PostInput): string {
+  const tags = (form.tags || '')
+    .split(/[,，]/)
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .map((t) => `"${t.replace(/"/g, '\\"')}"`)
+    .join(', ')
+  const escape = (s: string) => `"${(s || '').replace(/"/g, '\\"')}"`
+  const fm: string[] = ['---']
+  fm.push(`title: ${escape(form.title || '')}`)
+  fm.push(`category: ${escape(form.category || '')}`)
+  fm.push(`tags: [${tags}]`)
+  fm.push(`excerpt: ${escape(form.excerpt || '')}`)
+  fm.push('---')
+  return fm.join('\n') + '\n\n' + (form.content || '').trim() + '\n'
+}
+
+/** 触发浏览器下载 */
+function triggerDownload(filename: string, content: string) {
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 export default function PostForm({
   initial,
   mode = 'edit',
@@ -182,6 +292,7 @@ export default function PostForm({
   const savedHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mountedRef = useRef(false)
   const tagInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const tagsArray = useMemo(() => {
     return form.tags
@@ -297,6 +408,37 @@ export default function PostForm({
     update('excerpt', excerpt)
   }
 
+  function handleExportMarkdown() {
+    const filename = `${(form.title || 'untitled').replace(/[\\/:*?"<>|]/g, '_').trim() || 'untitled'}.md`
+    const md = buildExportMarkdown(form)
+    triggerDownload(filename, md)
+  }
+
+  function handleImportClick() {
+    fileInputRef.current?.click()
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    // 重置 value 以便再次选择同一文件
+    e.target.value = ''
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const raw = typeof reader.result === 'string' ? reader.result : ''
+      const parsed = parseImportedMarkdown(raw)
+      setForm((prev) => ({
+        ...prev,
+        title: parsed.title ?? prev.title,
+        category: parsed.category ?? prev.category,
+        tags: parsed.tags ?? prev.tags,
+        excerpt: parsed.excerpt ?? prev.excerpt,
+        content: parsed.content || prev.content,
+      }))
+    }
+    reader.readAsText(file, 'utf-8')
+  }
+
   async function handleSubmit(publishedValue: number) {
     if (!form.title.trim() || !form.content.trim()) {
       setError('标题和内容不能为空')
@@ -359,6 +501,39 @@ export default function PostForm({
           <span className={`editor-form__autosave${savedHintVisible ? ' editor-form__autosave--visible' : ''}`}>
             已自动保存
           </span>
+          <button
+            type="button"
+            className="editor-form__md-btn"
+            onClick={handleImportClick}
+            title="从 Markdown 文件导入"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            导入 Markdown
+          </button>
+          <button
+            type="button"
+            className="editor-form__md-btn"
+            onClick={handleExportMarkdown}
+            title="导出为 Markdown 文件"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            导出 Markdown
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".md,.markdown,text/markdown"
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+          />
         </div>
         <div className="editor-form__toolbar-right">
           {isNewMode && (

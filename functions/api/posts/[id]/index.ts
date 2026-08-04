@@ -23,6 +23,83 @@ function isNumeric(s: string): boolean {
   return /^\d+$/.test(s)
 }
 
+/** post_revisions 表的建表语句，所有需要写入/读取该表的入口都应先调用此函数。 */
+async function ensureRevisionsTable(db: D1Database): Promise<void> {
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS post_revisions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        post_id INTEGER NOT NULL,
+        title TEXT NOT NULL DEFAULT '',
+        content TEXT NOT NULL DEFAULT '',
+        excerpt TEXT NOT NULL DEFAULT '',
+        category TEXT NOT NULL DEFAULT '',
+        tags TEXT NOT NULL DEFAULT '',
+        cover_image TEXT NOT NULL DEFAULT '',
+        custom_js TEXT NOT NULL DEFAULT '',
+        author_id INTEGER,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`
+    )
+    .run()
+  await db
+    .prepare(
+      'CREATE INDEX IF NOT EXISTS idx_post_revisions_post_created ON post_revisions(post_id, created_at DESC)'
+    )
+    .run()
+}
+
+/** 把当前文章状态写入修订表，并清理超出 50 条上限的旧修订。 */
+async function saveRevision(
+  db: D1Database,
+  postId: number,
+  fields: {
+    title: string
+    content: string
+    excerpt: string
+    category: string
+    tags: string
+    cover_image: string
+    custom_js: string
+    author_id: number | null
+  }
+): Promise<void> {
+  await ensureRevisionsTable(db)
+  await db
+    .prepare(
+      `INSERT INTO post_revisions
+        (post_id, title, content, excerpt, category, tags, cover_image, custom_js, author_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      postId,
+      fields.title,
+      fields.content,
+      fields.excerpt,
+      fields.category,
+      fields.tags,
+      fields.cover_image,
+      fields.custom_js,
+      fields.author_id
+    )
+    .run()
+
+  // 仅保留最近 50 条修订
+  await db
+    .prepare(
+      `DELETE FROM post_revisions
+       WHERE post_id = ?
+         AND id NOT IN (
+           SELECT id FROM post_revisions
+           WHERE post_id = ?
+           ORDER BY created_at DESC, id DESC
+           LIMIT 50
+         )`
+    )
+    .bind(postId, postId)
+    .run()
+}
+
 async function getPostWithStats(db: D1Database, idParam: string) {
   const numeric = isNumeric(idParam)
   let post
@@ -120,7 +197,19 @@ export async function onRequestPut(context: {
 
   const existing = await env.DB.prepare('SELECT * FROM posts WHERE id = ?')
     .bind(postId)
-    .first<{ author_id: number | null; title: string; slug: string; is_pinned: number; is_featured: number }>()
+    .first<{
+      author_id: number | null
+      title: string
+      slug: string
+      is_pinned: number
+      is_featured: number
+      excerpt: string
+      content: string
+      category: string
+      tags: string
+      cover_image: string
+      custom_js: string
+    }>()
   if (!existing) {
     return error('Post not found', 404)
   }
@@ -160,6 +249,28 @@ export async function onRequestPut(context: {
     : existing.slug
 
   try {
+    // 在更新前保存当前文章快照到 post_revisions（仅当内容真正变化时）
+    const contentChanged =
+      existing.title !== title ||
+      existing.content !== content ||
+      existing.excerpt !== excerpt ||
+      existing.category !== category ||
+      existing.tags !== tags ||
+      existing.cover_image !== cover_image ||
+      existing.custom_js !== custom_js
+
+    if (contentChanged) {
+      await saveRevision(env.DB, postId, {
+        title: existing.title,
+        content: existing.content,
+        excerpt: existing.excerpt,
+        category: existing.category,
+        tags: existing.tags,
+        cover_image: existing.cover_image,
+        custom_js: existing.custom_js,
+        author_id: existing.author_id,
+      })
+    }
     await env.DB.prepare(
       `UPDATE posts SET
         title = ?, slug = ?, excerpt = ?, content = ?,

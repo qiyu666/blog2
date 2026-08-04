@@ -84,6 +84,52 @@ export async function deletePost(id: number): Promise<void> {
   await request<void>(`/api/posts/${id}`, { method: 'DELETE' });
 }
 
+// ===== 历史版本（Revisions） =====
+export interface Revision {
+  id: number;
+  created_at: string;
+  author_id: number | null;
+  author_username: string | null;
+  title: string;
+  title_excerpt: string;
+  content_length: number;
+}
+
+export interface RevisionDetail {
+  id: number;
+  post_id: number;
+  title: string;
+  content: string;
+  excerpt: string;
+  category: string;
+  tags: string;
+  cover_image: string;
+  custom_js: string;
+  author_id: number | null;
+  author_username: string | null;
+  created_at: string;
+}
+
+export async function getPostRevisions(id: number | string): Promise<Revision[]> {
+  return request<Revision[]>(`/api/posts/${id}/revisions`);
+}
+
+export async function getRevision(
+  id: number | string,
+  revisionId: number
+): Promise<RevisionDetail> {
+  return request<RevisionDetail>(`/api/posts/${id}/revisions/${revisionId}`);
+}
+
+export async function restoreRevision(
+  id: number | string,
+  revisionId: number
+): Promise<void> {
+  await request<{ success: boolean }>(`/api/posts/${id}/revisions/${revisionId}`, {
+    method: 'POST',
+  });
+}
+
 // ===== Auth =====
 export async function register(
   username: string,
