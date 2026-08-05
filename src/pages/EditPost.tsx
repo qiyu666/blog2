@@ -67,6 +67,7 @@ export default function EditPost() {
           cover_image: post.cover_image,
           published: post.published,
           custom_js: post.custom_js,
+          custom_cursor: post.custom_cursor,
         }}
         onSubmit={handleSubmit}
         submitLabel="保存修改"
