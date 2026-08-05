@@ -281,6 +281,16 @@ function langLabel(lang: string): string {
   return LANG_LABELS[key] || (key ? key.toUpperCase().slice(0, 1) + key.slice(1) : '代码')
 }
 
+const PRESET_CURSORS = new Set(['default', 'pointer', 'crosshair', 'text', 'help', 'grab', 'wait', 'copy'])
+
+function buildCursorStyle(value: string): string {
+  const v = value.trim()
+  if (!v) return 'default'
+  if (PRESET_CURSORS.has(v)) return v
+  if (v.startsWith('url(')) return v
+  return `url(${v}), auto`
+}
+
 /** Render comment content as sanitized Markdown HTML.
  *  Supports bold/italic/inline code/code blocks/links/lists/blockquotes (no images),
  *  and converts @username mentions into clickable internal links. */
@@ -1220,7 +1230,7 @@ export default function PostDetail() {
       <div className="post-main">
         <article
           className="article"
-          style={post.custom_cursor ? { cursor: post.custom_cursor as any } : undefined}
+          style={post.custom_cursor ? { cursor: buildCursorStyle(post.custom_cursor) } : undefined}
         >
         <SEO
           title={post.title}

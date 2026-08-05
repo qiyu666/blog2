@@ -832,16 +832,16 @@ export default function PostForm({
                 <input
                   type="text"
                   className="editor-form__input"
-                  value={form.custom_cursor?.startsWith('url(') ? form.custom_cursor : ''}
+                  value={form.custom_cursor?.startsWith('http') || form.custom_cursor?.endsWith('.cur') || form.custom_cursor?.endsWith('.png') || form.custom_cursor?.endsWith('.svg') ? form.custom_cursor : ''}
                   onChange={(e) => {
                     const url = e.target.value.trim()
-                    update('custom_cursor', url ? `url(${url}), auto` : '')
+                    update('custom_cursor', url)
                   }}
-                  placeholder="或粘贴光标图片 URL（.cur / .png / .svg）"
+                  placeholder="粘贴光标图片 URL（.cur / .png / .svg）"
                 />
-                {form.custom_cursor?.startsWith('url(') && (
+                {form.custom_cursor && !['default','pointer','crosshair','text','help','grab','wait','copy'].includes(form.custom_cursor) && (
                   <div className="editor-form__cursor-preview-box">
-                    <span style={{ cursor: form.custom_cursor as any }}>预览效果</span>
+                    <span style={{ cursor: `url(${form.custom_cursor}), auto` }}>预览效果</span>
                   </div>
                 )}
               </div>
