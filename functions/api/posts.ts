@@ -130,6 +130,11 @@ export async function onRequestPost(context: {
 
   const slug = await uniqueSlug(env.DB, slugify(title))
 
+  // 自动添加 custom_cursor 列（兼容旧数据库）
+  try {
+    await env.DB.prepare(`ALTER TABLE posts ADD COLUMN custom_cursor TEXT NOT NULL DEFAULT ''`).run()
+  } catch { /* 列已存在 */ }
+
   try {
     const result = await env.DB.prepare(
       `INSERT INTO posts (title, slug, excerpt, content, author, author_id, category, tags, cover_image, published, is_pinned, is_featured, custom_js, custom_cursor)
