@@ -780,7 +780,10 @@ export default function PostForm({
                     className={`editor-form__cursor-preset${(form.custom_cursor || '') === v ? ' editor-form__cursor-preset--active' : ''}`}
                     onClick={() => update('custom_cursor', v)}
                   >
-                    <span className="cursor-preview" style={{ cursor }}>Aa</span>
+                    <span
+                      className="cursor-preview"
+                      style={{ cursor: cursor === 'default' ? 'auto' : cursor }}
+                    >Aa</span>
                     <span>{label}</span>
                   </button>
                 ))}
@@ -796,13 +799,19 @@ export default function PostForm({
                   placeholder="粘贴光标图片 URL（.cur / .png / .svg，建议 16x16 或 32x32）"
                 />
                 {form.custom_cursor && !isPresetCursor(form.custom_cursor) && (
-                  <div className="editor-form__cursor-preview-box" style={{ cursor: buildCursorStyle(form.custom_cursor) }}>
+                  <div
+                    className="editor-form__cursor-preview-box"
+                    style={{ cursor: buildCursorStyle(form.custom_cursor) }}
+                  >
                     <span>将鼠标移到此处测试光标</span>
-                    <span className="editor-form__cursor-hint">图片建议不超过 128×128 像素，过大浏览器将忽略</span>
+                    <span className="editor-form__cursor-hint">图片建议不超过 128×128 像素，且必须是直接图片链接</span>
                   </div>
                 )}
                 {isPresetCursor(form.custom_cursor) && form.custom_cursor !== '' && (
-                  <div className="editor-form__cursor-preview-box" style={{ cursor: buildCursorStyle(form.custom_cursor) }}>
+                  <div
+                    className="editor-form__cursor-preview-box"
+                    style={{ cursor: form.custom_cursor }}
+                  >
                     <span>将鼠标移到此处测试光标</span>
                   </div>
                 )}

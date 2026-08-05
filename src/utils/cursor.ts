@@ -30,11 +30,13 @@ export function getCursorLabel(value: string): string {
 }
 
 export function buildCursorStyle(value: string | undefined | null): string {
-  if (!value) return 'default'
+  if (!value) return 'auto'
   const v = value.trim()
-  if (!v) return 'default'
+  if (!v) return 'auto'
   if (PRESET_CURSORS.has(v)) return v
   if (v.startsWith('url(')) return v
+  // 对于 URL 型光标，必须包含 fallback，否则浏览器可能忽略
+  // 浏览器只支持 .cur / .png / .gif / .jpg / .jpeg / .svg / .ico
   return `url("${v}") 16 16, auto`
 }
 

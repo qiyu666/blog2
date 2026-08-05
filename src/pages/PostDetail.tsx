@@ -581,6 +581,35 @@ export default function PostDetail() {
     return () => clearTimeout(timer)
   }, [mentionQuery])
 
+  // 应用文章自定义光标：通过 <style> 标签强制所有子元素继承
+  useEffect(() => {
+    if (!post?.custom_cursor) return
+    const cursorValue = buildCursorStyle(post.custom_cursor)
+    if (!cursorValue || cursorValue === 'auto') return
+
+    // 先移除旧的注入样式，避免重复
+    document
+      .querySelectorAll('style[data-article-cursor]')
+      .forEach((el) => el.remove())
+
+    const style = document.createElement('style')
+    style.dataset.articleCursor = String(post.id)
+    style.textContent = `
+      .article--custom-cursor,
+      .article--custom-cursor *,
+      .article--custom-cursor *:hover,
+      .article--custom-cursor *:active {
+        cursor: ${cursorValue} !important;
+      }
+    `
+    document.head.appendChild(style)
+
+    // 当组件离开或 cursor 变化时清理
+    return () => {
+      style.remove()
+    }
+  }, [post?.id, post?.custom_cursor])
+
   // 执行文章自定义脚本
   useEffect(() => {
     if (!post?.custom_js) return
@@ -1221,8 +1250,6 @@ export default function PostDetail() {
       <div className="post-main">
         <article
           className={`article${post.custom_cursor ? ' article--custom-cursor' : ''}`}
-          data-cursor={post.custom_cursor || ''}
-          style={post.custom_cursor ? { cursor: buildCursorStyle(post.custom_cursor) } : undefined}
         >
         <SEO
           title={post.title}
