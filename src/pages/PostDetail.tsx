@@ -41,6 +41,7 @@ import {
 import type { PostNeighbor, RelatedPost, PostStats } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import { useReadingHistory } from '../hooks/useReadingHistory'
+import { buildCursorStyle } from '../utils/cursor'
 import SEO, { setMetaTag, setJsonLd, cleanupDynamicMeta } from '../components/SEO'
 import PostSidebar from '../components/PostSidebar'
 import TableOfContents from '../components/TableOfContents'
@@ -279,19 +280,6 @@ const LANG_LABELS: Record<string, string> = {
 function langLabel(lang: string): string {
   const key = (lang || '').toLowerCase().trim()
   return LANG_LABELS[key] || (key ? key.toUpperCase().slice(0, 1) + key.slice(1) : '代码')
-}
-
-const PRESET_CURSORS = new Set(['default', 'pointer', 'crosshair', 'text', 'help', 'grab', 'wait', 'copy', 'not-allowed', 'move', 'cell', 'alias', 'progress'])
-
-export function buildCursorStyle(value: string | undefined | null): string {
-  if (!value) return 'default'
-  const v = value.trim()
-  if (!v) return 'default'
-  if (PRESET_CURSORS.has(v)) return v
-  // 已经是 url(...) 格式，直接返回
-  if (v.startsWith('url(')) return v
-  // 否则包裹为 url("..."), auto
-  return `url("${v}"), auto`
 }
 
 /** Render comment content as sanitized Markdown HTML.
@@ -1232,7 +1220,8 @@ export default function PostDetail() {
       <PostSidebar post={post} />
       <div className="post-main">
         <article
-          className="article"
+          className={`article${post.custom_cursor ? ' article--custom-cursor' : ''}`}
+          data-cursor={post.custom_cursor || ''}
           style={post.custom_cursor ? { cursor: buildCursorStyle(post.custom_cursor) } : undefined}
         >
         <SEO

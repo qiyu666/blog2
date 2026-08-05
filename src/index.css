@@ -3916,6 +3916,19 @@ input, textarea, select {
   color: var(--muted);
 }
 
+/* 文章自定义光标：覆盖子元素默认光标 */
+.article--custom-cursor,
+.article--custom-cursor *,
+.article--custom-cursor *:hover {
+  cursor: inherit !important;
+}
+
+.article--custom-cursor a,
+.article--custom-cursor button,
+.article--custom-cursor img {
+  cursor: inherit !important;
+}
+
 .editor-form__code-info {
   display: flex;
   justify-content: space-between;
