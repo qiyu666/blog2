@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { PostInput } from '../types'
 import { getCategories, type PublicCategory } from '../api'
+import { buildCursorStyle } from '../pages/PostDetail'
 import MarkdownEditor from './MarkdownEditor'
 import CoverUploader from './CoverUploader'
 
@@ -832,16 +833,25 @@ export default function PostForm({
                 <input
                   type="text"
                   className="editor-form__input"
-                  value={form.custom_cursor?.startsWith('http') || form.custom_cursor?.endsWith('.cur') || form.custom_cursor?.endsWith('.png') || form.custom_cursor?.endsWith('.svg') ? form.custom_cursor : ''}
+                  value={(() => {
+                    const v = form.custom_cursor || ''
+                    // 预设值不在输入框显示
+                    const presets = ['default','pointer','crosshair','text','help','grab','wait','copy']
+                    if (presets.includes(v)) return ''
+                    // 去掉 url(...) 包裹，显示原始 URL
+                    if (v.startsWith('url("') && v.endsWith('"), auto')) return v.slice(5, -8)
+                    if (v.startsWith('url(') && v.endsWith('), auto')) return v.slice(4, -7)
+                    return v
+                  })()}
                   onChange={(e) => {
-                    const url = e.target.value.trim()
-                    update('custom_cursor', url)
+                    update('custom_cursor', e.target.value.trim())
                   }}
-                  placeholder="粘贴光标图片 URL（.cur / .png / .svg）"
+                  placeholder="粘贴光标图片 URL（.cur / .png / .svg，建议 32x32）"
                 />
                 {form.custom_cursor && !['default','pointer','crosshair','text','help','grab','wait','copy'].includes(form.custom_cursor) && (
                   <div className="editor-form__cursor-preview-box">
-                    <span style={{ cursor: `url(${form.custom_cursor}), auto` }}>预览效果</span>
+                    <span style={{ cursor: buildCursorStyle(form.custom_cursor) }}>预览效果</span>
+                    <span className="editor-form__cursor-hint">将鼠标移到上方文字测试光标 · 图片建议不超过 128x128</span>
                   </div>
                 )}
               </div>

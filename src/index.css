@@ -3891,15 +3891,29 @@ input, textarea, select {
 }
 
 .editor-form__cursor-preview-box {
-  display: inline-flex;
-  align-items: center;
-  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 20px;
   background: var(--bg-warm);
   border: 1px dashed var(--line);
   border-radius: var(--radius-sm);
-  font-size: 0.875rem;
-  color: var(--ink-soft);
   align-self: flex-start;
+}
+
+.editor-form__cursor-preview-box > span:first-child {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  padding: 8px 12px;
+  background: var(--surface);
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.editor-form__cursor-hint {
+  font-size: 0.7rem;
+  color: var(--muted);
 }
 
 .editor-form__code-info {

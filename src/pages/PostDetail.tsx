@@ -281,14 +281,17 @@ function langLabel(lang: string): string {
   return LANG_LABELS[key] || (key ? key.toUpperCase().slice(0, 1) + key.slice(1) : '代码')
 }
 
-const PRESET_CURSORS = new Set(['default', 'pointer', 'crosshair', 'text', 'help', 'grab', 'wait', 'copy'])
+const PRESET_CURSORS = new Set(['default', 'pointer', 'crosshair', 'text', 'help', 'grab', 'wait', 'copy', 'not-allowed', 'move', 'cell', 'alias', 'progress'])
 
-function buildCursorStyle(value: string): string {
+export function buildCursorStyle(value: string | undefined | null): string {
+  if (!value) return 'default'
   const v = value.trim()
   if (!v) return 'default'
   if (PRESET_CURSORS.has(v)) return v
+  // 已经是 url(...) 格式，直接返回
   if (v.startsWith('url(')) return v
-  return `url(${v}), auto`
+  // 否则包裹为 url("..."), auto
+  return `url("${v}"), auto`
 }
 
 /** Render comment content as sanitized Markdown HTML.
