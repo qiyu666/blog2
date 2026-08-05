@@ -1218,7 +1218,10 @@ export default function PostDetail() {
     <div className="post-layout">
       <PostSidebar post={post} />
       <div className="post-main">
-        <article className="article">
+        <article
+          className="article"
+          style={post.custom_cursor ? { cursor: post.custom_cursor as any } : undefined}
+        >
         <SEO
           title={post.title}
           description={post.excerpt || post.content.slice(0, 150)}

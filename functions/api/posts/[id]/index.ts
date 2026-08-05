@@ -17,6 +17,7 @@ interface PostInput {
   is_pinned?: number
   is_featured?: number
   custom_js?: string
+  custom_cursor?: string
 }
 
 function isNumeric(s: string): boolean {
@@ -209,6 +210,7 @@ export async function onRequestPut(context: {
       tags: string
       cover_image: string
       custom_js: string
+      custom_cursor: string
     }>()
   if (!existing) {
     return error('Post not found', 404)
@@ -226,6 +228,12 @@ export async function onRequestPut(context: {
   const tags = cleanText(body.tags, 200).trim()
   const cover_image = cleanText(body.cover_image, 500).trim()
   const custom_js = cleanText(body.custom_js || '', 20000)
+  const custom_cursor = cleanText(body.custom_cursor || '', 500).trim()
+
+  // 自动添加 custom_cursor 列（兼容旧数据库）
+  try {
+    await env.DB.prepare(`ALTER TABLE posts ADD COLUMN custom_cursor TEXT NOT NULL DEFAULT ''`).run()
+  } catch { /* 列已存在 */ }
 
   if (!title || !content) {
     return error('标题和内容不能为空')
@@ -257,7 +265,8 @@ export async function onRequestPut(context: {
       existing.category !== category ||
       existing.tags !== tags ||
       existing.cover_image !== cover_image ||
-      existing.custom_js !== custom_js
+      existing.custom_js !== custom_js ||
+      (existing.custom_cursor || '') !== custom_cursor
 
     if (contentChanged) {
       await saveRevision(env.DB, postId, {
@@ -276,11 +285,11 @@ export async function onRequestPut(context: {
         title = ?, slug = ?, excerpt = ?, content = ?,
         category = ?, tags = ?, cover_image = ?,
         published = ?, is_pinned = ?, is_featured = ?,
-        custom_js = ?,
+        custom_js = ?, custom_cursor = ?,
         updated_at = datetime('now')
        WHERE id = ?`
     )
-      .bind(title, newSlug, excerpt, content, category, tags, cover_image, published, is_pinned, is_featured, custom_js, postId)
+      .bind(title, newSlug, excerpt, content, category, tags, cover_image, published, is_pinned, is_featured, custom_js, custom_cursor, postId)
       .run()
 
     const updated = await getPostWithStats(env.DB, String(postId))

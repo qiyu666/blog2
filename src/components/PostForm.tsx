@@ -256,6 +256,7 @@ export default function PostForm({
     cover_image: initial?.cover_image ?? '',
     published: initial?.published ?? 1,
     custom_js: initial?.custom_js ?? '',
+    custom_cursor: initial?.custom_cursor ?? '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -750,6 +751,99 @@ export default function PostForm({
               <div className="editor-form__code-info">
                 <span>仅在文章详情页执行 · 限制 20KB</span>
                 <span>{(form.custom_js || '').length} / 20000</span>
+              </div>
+            </div>
+
+            {/* 自定义鼠标光标 */}
+            <div className="editor-form__advanced-row">
+              <div className="editor-form__advanced-header">
+                <label className="editor-form__advanced-label">自定义鼠标光标</label>
+                <span className="editor-form__advanced-hint">
+                  为文章设置个性化光标样式，读者阅读时生效
+                </span>
+              </div>
+              <div className="editor-form__cursor-presets">
+                <button
+                  type="button"
+                  className={`editor-form__cursor-preset${!form.custom_cursor ? ' editor-form__cursor-preset--active' : ''}`}
+                  onClick={() => update('custom_cursor', '')}
+                >
+                  <span className="cursor-preview" style={{ cursor: 'default' }}>Aa</span>
+                  <span>默认</span>
+                </button>
+                <button
+                  type="button"
+                  className={`editor-form__cursor-preset${form.custom_cursor === 'pointer' ? ' editor-form__cursor-preset--active' : ''}`}
+                  onClick={() => update('custom_cursor', 'pointer')}
+                >
+                  <span className="cursor-preview" style={{ cursor: 'pointer' }}>Aa</span>
+                  <span>手形</span>
+                </button>
+                <button
+                  type="button"
+                  className={`editor-form__cursor-preset${form.custom_cursor === 'crosshair' ? ' editor-form__cursor-preset--active' : ''}`}
+                  onClick={() => update('custom_cursor', 'crosshair')}
+                >
+                  <span className="cursor-preview" style={{ cursor: 'crosshair' }}>Aa</span>
+                  <span>十字</span>
+                </button>
+                <button
+                  type="button"
+                  className={`editor-form__cursor-preset${form.custom_cursor === 'text' ? ' editor-form__cursor-preset--active' : ''}`}
+                  onClick={() => update('custom_cursor', 'text')}
+                >
+                  <span className="cursor-preview" style={{ cursor: 'text' }}>Aa</span>
+                  <span>文本</span>
+                </button>
+                <button
+                  type="button"
+                  className={`editor-form__cursor-preset${form.custom_cursor === 'help' ? ' editor-form__cursor-preset--active' : ''}`}
+                  onClick={() => update('custom_cursor', 'help')}
+                >
+                  <span className="cursor-preview" style={{ cursor: 'help' }}>Aa</span>
+                  <span>帮助</span>
+                </button>
+                <button
+                  type="button"
+                  className={`editor-form__cursor-preset${form.custom_cursor === 'grab' ? ' editor-form__cursor-preset--active' : ''}`}
+                  onClick={() => update('custom_cursor', 'grab')}
+                >
+                  <span className="cursor-preview" style={{ cursor: 'grab' }}>Aa</span>
+                  <span>抓取</span>
+                </button>
+                <button
+                  type="button"
+                  className={`editor-form__cursor-preset${form.custom_cursor === 'wait' ? ' editor-form__cursor-preset--active' : ''}`}
+                  onClick={() => update('custom_cursor', 'wait')}
+                >
+                  <span className="cursor-preview" style={{ cursor: 'wait' }}>Aa</span>
+                  <span>等待</span>
+                </button>
+                <button
+                  type="button"
+                  className={`editor-form__cursor-preset${form.custom_cursor === 'copy' ? ' editor-form__cursor-preset--active' : ''}`}
+                  onClick={() => update('custom_cursor', 'copy')}
+                >
+                  <span className="cursor-preview" style={{ cursor: 'copy' }}>Aa</span>
+                  <span>复制</span>
+                </button>
+              </div>
+              <div className="editor-form__cursor-custom">
+                <input
+                  type="text"
+                  className="editor-form__input"
+                  value={form.custom_cursor?.startsWith('url(') ? form.custom_cursor : ''}
+                  onChange={(e) => {
+                    const url = e.target.value.trim()
+                    update('custom_cursor', url ? `url(${url}), auto` : '')
+                  }}
+                  placeholder="或粘贴光标图片 URL（.cur / .png / .svg）"
+                />
+                {form.custom_cursor?.startsWith('url(') && (
+                  <div className="editor-form__cursor-preview-box">
+                    <span style={{ cursor: form.custom_cursor as any }}>预览效果</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

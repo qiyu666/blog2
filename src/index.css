@@ -3828,6 +3828,80 @@ input, textarea, select {
   background: rgba(239, 68, 68, 0.08);
 }
 
+/* 自定义光标预设 */
+.editor-form__cursor-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: var(--space-sm);
+}
+
+.editor-form__cursor-preset {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+  transition: all var(--transition);
+  min-width: 64px;
+}
+
+.editor-form__cursor-preset:hover {
+  border-color: var(--accent);
+  background: var(--accent-faint);
+}
+
+.editor-form__cursor-preset--active {
+  border-color: var(--accent);
+  background: var(--accent-faint);
+  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.15);
+}
+
+.editor-form__cursor-preset .cursor-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 28px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink);
+  border-radius: 4px;
+  background: var(--bg-warm);
+  border: 1px solid var(--line-soft);
+}
+
+.editor-form__cursor-preset > span:last-child {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.editor-form__cursor-preset--active > span:last-child {
+  color: var(--accent);
+}
+
+.editor-form__cursor-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.editor-form__cursor-preview-box {
+  display: inline-flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--bg-warm);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+  align-self: flex-start;
+}
+
 .editor-form__code-info {
   display: flex;
   justify-content: space-between;

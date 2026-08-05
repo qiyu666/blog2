@@ -18,6 +18,7 @@ export interface Post {
   is_pinned?: number;
   is_featured?: number;
   custom_js?: string;
+  custom_cursor?: string;
   created_at: string;
   updated_at: string;
 }
@@ -31,6 +32,7 @@ export interface PostInput {
   cover_image: string;
   published?: number;
   custom_js?: string;
+  custom_cursor?: string;
 }
 
 export interface User {
