@@ -978,10 +978,10 @@ export default function PostDetail() {
     }
   }
 
-  // Ctrl+P 选中内容 → 引用格式插入评论框
+  // Ctrl+M 选中内容 → 引用格式插入评论框
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'p') return
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'm') return
       const selection = window.getSelection()
       const text = selection?.toString().trim()
       if (!text) return
