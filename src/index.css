@@ -6310,7 +6310,7 @@ input, textarea, select {
   background: var(--surface);
   position: sticky;
   top: 64px;
-  z-index: 5;
+  z-index: 101;
   backdrop-filter: blur(10px);
 }
 
