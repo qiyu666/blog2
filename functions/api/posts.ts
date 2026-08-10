@@ -20,7 +20,6 @@ interface PostInput {
   is_pinned?: number
   is_featured?: number
   custom_js?: string
-  custom_cursor?: string
 }
 
 export async function onRequestGet(context: {
@@ -114,7 +113,6 @@ export async function onRequestPost(context: {
   const cover_image = cleanText(body.cover_image, 500).trim()
   // 限制自定义 JS 长度为 20KB
   const custom_js = cleanText(body.custom_js || '', 20000)
-  const custom_cursor = cleanText(body.custom_cursor || '', 500).trim()
 
   if (!title || !content) {
     return error('标题和内容不能为空')
@@ -130,15 +128,10 @@ export async function onRequestPost(context: {
 
   const slug = await uniqueSlug(env.DB, slugify(title))
 
-  // 自动添加 custom_cursor 列（兼容旧数据库）
-  try {
-    await env.DB.prepare(`ALTER TABLE posts ADD COLUMN custom_cursor TEXT NOT NULL DEFAULT ''`).run()
-  } catch { /* 列已存在 */ }
-
   try {
     const result = await env.DB.prepare(
-      `INSERT INTO posts (title, slug, excerpt, content, author, author_id, category, tags, cover_image, published, is_pinned, is_featured, custom_js, custom_cursor)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO posts (title, slug, excerpt, content, author, author_id, category, tags, cover_image, published, is_pinned, is_featured, custom_js)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         title,
@@ -153,8 +146,7 @@ export async function onRequestPost(context: {
         published,
         is_pinned,
         is_featured,
-        custom_js,
-        custom_cursor
+        custom_js
       )
       .run()
 

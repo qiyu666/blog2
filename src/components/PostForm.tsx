@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { PostInput } from '../types'
 import { getCategories, type PublicCategory } from '../api'
-import { buildCursorStyle, isPresetCursor } from '../utils/cursor'
 import MarkdownEditor from './MarkdownEditor'
 import CoverUploader from './CoverUploader'
 
@@ -257,7 +256,6 @@ export default function PostForm({
     cover_image: initial?.cover_image ?? '',
     published: initial?.published ?? 1,
     custom_js: initial?.custom_js ?? '',
-    custom_cursor: initial?.custom_cursor ?? '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -752,69 +750,6 @@ export default function PostForm({
               <div className="editor-form__code-info">
                 <span>仅在文章详情页执行 · 限制 20KB</span>
                 <span>{(form.custom_js || '').length} / 20000</span>
-              </div>
-            </div>
-
-            {/* 自定义鼠标光标 */}
-            <div className="editor-form__advanced-row">
-              <div className="editor-form__advanced-header">
-                <label className="editor-form__advanced-label">自定义鼠标光标</label>
-                <span className="editor-form__advanced-hint">
-                  为文章设置个性化光标样式，读者阅读时生效
-                </span>
-              </div>
-              <div className="editor-form__cursor-presets">
-                {[
-                  { v: '', label: '默认', cursor: 'default' },
-                  { v: 'pointer', label: '手形', cursor: 'pointer' },
-                  { v: 'crosshair', label: '十字', cursor: 'crosshair' },
-                  { v: 'text', label: '文本', cursor: 'text' },
-                  { v: 'help', label: '帮助', cursor: 'help' },
-                  { v: 'grab', label: '抓取', cursor: 'grab' },
-                  { v: 'copy', label: '复制', cursor: 'copy' },
-                  { v: 'not-allowed', label: '禁止', cursor: 'not-allowed' },
-                ].map(({ v, label, cursor }) => (
-                  <button
-                    key={v || 'default'}
-                    type="button"
-                    className={`editor-form__cursor-preset${(form.custom_cursor || '') === v ? ' editor-form__cursor-preset--active' : ''}`}
-                    onClick={() => update('custom_cursor', v)}
-                  >
-                    <span
-                      className="cursor-preview"
-                      style={{ cursor: cursor === 'default' ? 'auto' : cursor }}
-                    >Aa</span>
-                    <span>{label}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="editor-form__cursor-custom">
-                <input
-                  type="text"
-                  className="editor-form__input"
-                  value={isPresetCursor(form.custom_cursor) ? '' : (form.custom_cursor || '').replace(/^url\(["']?/, '').replace(/["']?\),?\s*auto$/, '')}
-                  onChange={(e) => {
-                    update('custom_cursor', e.target.value.trim())
-                  }}
-                  placeholder="粘贴光标图片 URL（.cur / .png / .svg，建议 16x16 或 32x32）"
-                />
-                {form.custom_cursor && !isPresetCursor(form.custom_cursor) && (
-                  <div
-                    className="editor-form__cursor-preview-box"
-                    style={{ cursor: buildCursorStyle(form.custom_cursor) }}
-                  >
-                    <span>将鼠标移到此处测试光标</span>
-                    <span className="editor-form__cursor-hint">图片建议不超过 128×128 像素，且必须是直接图片链接</span>
-                  </div>
-                )}
-                {isPresetCursor(form.custom_cursor) && form.custom_cursor !== '' && (
-                  <div
-                    className="editor-form__cursor-preview-box"
-                    style={{ cursor: form.custom_cursor }}
-                  >
-                    <span>将鼠标移到此处测试光标</span>
-                  </div>
-                )}
               </div>
             </div>
           </div>

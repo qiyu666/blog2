@@ -3911,33 +3911,6 @@ input, textarea, select {
   display: inline-block;
 }
 
-.editor-form__cursor-hint {
-  font-size: 0.7rem;
-  color: var(--muted);
-}
-
-/* 光标预览区：继承父元素的 cursor */
-.editor-form__cursor-preview-box {
-  min-height: 48px;
-  user-select: none;
-}
-
-.editor-form__cursor-preview-box * {
-  cursor: inherit !important;
-}
-
-/* 预设按钮内的光标预览（由 inline style 提供 cursor） */
-.editor-form__cursor-preset .cursor-preview {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 文章自定义光标：由运行时注入 <style> 标签控制，此处仅预留类名 */
-.article--custom-cursor {
-  cursor: auto;
-}
-
 .editor-form__code-info {
   display: flex;
   justify-content: space-between;
