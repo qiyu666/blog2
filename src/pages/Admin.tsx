@@ -700,7 +700,7 @@ export default function Admin() {
 
           {/* 仪表盘 */}
           {activeTab === 'dashboard' && (
-            <DashboardView stats={stats} posts={posts} comments={comments} users={users} categoryStats={categoryStats} analytics={analytics} />
+            <DashboardView stats={stats} posts={posts} comments={comments} users={users} categoryStats={categoryStats} analytics={analytics} pendingComments={pendingComments} onModerateComment={handleModerateComment} setActiveTab={setActiveTab} />
           )}
 
           {/* 用户管理 */}
@@ -997,8 +997,10 @@ function DashboardView({
   posts,
   comments,
   users,
-  categoryStats,
   analytics,
+  pendingComments,
+  onModerateComment,
+  setActiveTab,
 }: {
   stats: any
   posts: AdminPost[]
@@ -1006,6 +1008,9 @@ function DashboardView({
   users: AdminUser[]
   categoryStats: { name: string; count: number }[]
   analytics: AnalyticsData | null
+  pendingComments: AdminComment[]
+  onModerateComment: (id: number, action: 'approve' | 'reject' | 'spam') => void
+  setActiveTab: (tab: Tab) => void
 }) {
   const statCards = [
     { label: '总用户数', value: stats.users, icon: '👥', color: 'var(--accent)', change: `+${Math.min(stats.users, 5)} 本周` },
@@ -1033,10 +1038,10 @@ function DashboardView({
         {statCards.map((card, i) => (
           <div
             key={i}
-            className="stat-card"
+            className={`stat-card stat-card--${card.color.includes('accent') ? 'accent' : card.color.includes('violet') ? 'violet' : card.color.includes('pink') ? 'pink' : 'cyan'}`}
             style={{ '--stat-color': card.color } as React.CSSProperties}
           >
-            <div className="stat-card__icon">{card.icon}</div>
+            <div className={`stat-card__icon${card.icon === '💬' && stats.pendingComments > 0 ? ' stat-card__icon--pulse' : ''}`}>{card.icon}</div>
             <div className="stat-card__body">
               <div className="stat-card__value">{card.value}</div>
               <div className="stat-card__label">{card.label}</div>
@@ -1046,149 +1051,232 @@ function DashboardView({
         ))}
       </div>
 
-      {/* 图表区域 */}
-      <div className="dashboard__charts">
-        <div className="chart-card">
-          <div className="chart-card__header">
-            <h3 className="chart-card__title">近 7 天访问趋势</h3>
-            <div className="chart-card__tabs">
-              <span className="chart-card__legend">文章 / 用户 / 评论</span>
+      {/* 快捷操作 + 待处理通知 */}
+      <div className="dashboard__top">
+        <div>
+          <div className="chart-card" style={{ marginBottom: 'var(--space-lg)' }}>
+            <div className="chart-card__header">
+              <h3 className="chart-card__title">快捷操作</h3>
             </div>
-          </div>
-          <div className="chart-card__body">
-            {analytics?.trends7d && analytics.trends7d.length > 0 ? (
-              <TrendChart data={analytics.trends7d} />
-            ) : (
-              <div className="chart-placeholder">
-                <div className="chart-placeholder__text">暂无数据</div>
+            <div className="chart-card__body">
+              <div className="quick-actions">
+                <Link to="/new" className="quick-action">
+                  <span className="quick-action__icon">✍️</span>
+                  <span className="quick-action__label">写新文章</span>
+                </Link>
+                <button type="button" className="quick-action" onClick={() => setActiveTab('comments')}>
+                  <span className="quick-action__icon">💬</span>
+                  <span className="quick-action__label">审核评论</span>
+                  {pendingComments.length > 0 && (
+                    <span className="quick-action__count">{pendingComments.length} 待审</span>
+                  )}
+                </button>
+                <button type="button" className="quick-action" onClick={() => setActiveTab('bugs')}>
+                  <span className="quick-action__icon">🐛</span>
+                  <span className="quick-action__label">处理反馈</span>
+                  {stats.openBugs > 0 && (
+                    <span className="quick-action__count">{stats.openBugs} 待处理</span>
+                  )}
+                </button>
+                <button type="button" className="quick-action" onClick={() => setActiveTab('reports')}>
+                  <span className="quick-action__icon">⚑</span>
+                  <span className="quick-action__label">举报审核</span>
+                  {stats.pendingReports > 0 && (
+                    <span className="quick-action__count">{stats.pendingReports} 待处理</span>
+                  )}
+                </button>
+                <Link to="/analytics" className="quick-action">
+                  <span className="quick-action__icon">📊</span>
+                  <span className="quick-action__label">数据分析</span>
+                </Link>
+                <Link to="/settings" className="quick-action">
+                  <span className="quick-action__icon">⚙️</span>
+                  <span className="quick-action__label">站点设置</span>
+                </Link>
               </div>
-            )}
+            </div>
           </div>
         </div>
 
-        <div className="chart-card chart-card--small">
-          <div className="chart-card__header">
-            <h3 className="chart-card__title">分类分布</h3>
-          </div>
-          <div className="chart-card__body">
-            <div className="category-dist">
-              {categoryStats.slice(0, 6).map((c, i) => (
-                <div key={i} className="category-dist__item">
-                  <div className="category-dist__head">
-                    <span className="category-dist__name">{c.name}</span>
-                    <span className="category-dist__count">{c.count} 篇</span>
+        <div>
+          {pendingComments.length > 0 || stats.pendingReports > 0 || stats.openBugs > 0 ? (
+            <div className="pending-panel">
+              <div className="pending-panel__header">
+                <h3 className="pending-panel__title">
+                  待处理 <span className="pending-panel__badge">{pendingComments.length + stats.pendingReports + stats.openBugs}</span>
+                </h3>
+                <button type="button" className="recent-card__more" onClick={() => setActiveTab('comments')}>查看全部 →</button>
+              </div>
+              <div className="pending-panel__body">
+                {pendingComments.slice(0, 3).map((c) => (
+                  <div key={c.id} className="pending-item">
+                    <div className="pending-item__info">
+                      <div className="pending-item__label">📝 评论待审</div>
+                      <div className="pending-item__meta">
+                        @{c.author_username} <span className="pending-item__dot">·</span> {formatTime(c.created_at)}
+                      </div>
+                    </div>
+                    <div className="pending-item__actions">
+                      <button className="pending-item__btn pending-item__btn--approve" onClick={() => onModerateComment(c.id, 'approve')}>✓</button>
+                      <button className="pending-item__btn pending-item__btn--reject" onClick={() => onModerateComment(c.id, 'reject')}>✕</button>
+                    </div>
                   </div>
-                  <div className="category-dist__bar">
-                    <div
-                      className="category-dist__fill"
-                      style={{
-                        width: `${(c.count / (categoryStats[0]?.count || 1)) * 100}%`,
-                      }}
-                    />
+                ))}
+                {stats.pendingReports > 0 && (
+                  <div className="pending-item">
+                    <div className="pending-item__info">
+                      <div className="pending-item__label">⚑ {stats.pendingReports} 条举报待处理</div>
+                      <div className="pending-item__meta">点击前往审核</div>
+                    </div>
+                    <button className="pending-item__btn pending-item__btn--approve" onClick={() => setActiveTab('reports')}>查看</button>
                   </div>
-                </div>
-              ))}
+                )}
+                {stats.openBugs > 0 && (
+                  <div className="pending-item">
+                    <div className="pending-item__info">
+                      <div className="pending-item__label">🐛 {stats.openBugs} 个 Bug 待处理</div>
+                      <div className="pending-item__meta">点击前往处理</div>
+                    </div>
+                    <button className="pending-item__btn pending-item__btn--approve" onClick={() => setActiveTab('bugs')}>查看</button>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="pending-panel">
+              <div className="pending-panel__header" style={{ background: 'linear-gradient(180deg, rgba(34,197,94,0.06) 0%, transparent 100%)' }}>
+                <h3 className="pending-panel__title">
+                  一切正常 <span className="pending-panel__badge" style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}>✓</span>
+                </h3>
+              </div>
+              <div className="pending-panel__body" style={{ padding: 'var(--space-lg)', textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', marginBottom: 'var(--space-xs)' }}>🎊</div>
+                <div style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>暂无待处理事项</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 最新动态 */}
-      <div className="dashboard__recent">
-        {/* 最新文章 */}
-        <div className="recent-card">
-          <div className="recent-card__header">
-            <h3 className="recent-card__title">最新文章</h3>
-            <Link to="/admin" className="recent-card__more">查看全部 →</Link>
-          </div>
-          <div className="recent-card__body">
-            {recentPosts.length === 0 ? (
-              <EmptyState text="暂无文章" icon="📝" size="sm" />
-            ) : (
-              recentPosts.map((p) => (
-                <div key={p.id} className="recent-item">
-                  <div className="recent-item__content">
-                    <Link to={`/post/${p.slug}`} className="recent-item__title">
-                      {p.title}
-                    </Link>
-                    <div className="recent-item__meta">
-                      <span>@{p.author_username}</span>
-                      <span>·</span>
-                      <span>{formatTime(p.created_at)}</span>
-                    </div>
-                  </div>
-                  <div className="recent-item__stats">
-                    <span>👁 {formatNumber(p.views)}</span>
-                    <span>💬 {p.comments_count}</span>
-                  </div>
+      {/* 图表 + 最新动态 */}
+      <div className="dashboard__bottom">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
+          {/* 图表区域 */}
+          <div className="chart-card">
+            <div className="chart-card__header">
+              <h3 className="chart-card__title">近 7 天访问趋势</h3>
+              <div className="chart-card__tabs">
+                <span className="chart-card__legend">文章 / 用户 / 评论</span>
+              </div>
+            </div>
+            <div className="chart-card__body">
+              {analytics?.trends7d && analytics.trends7d.length > 0 ? (
+                <TrendChart data={analytics.trends7d} />
+              ) : (
+                <div className="chart-placeholder">
+                  <div className="chart-placeholder__text">暂无数据</div>
                 </div>
-              ))
-            )}
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* 最新评论 */}
-        <div className="recent-card">
-          <div className="recent-card__header">
-            <h3 className="recent-card__title">最新评论</h3>
-            <Link to="/admin" className="recent-card__more">查看全部 →</Link>
-          </div>
-          <div className="recent-card__body">
-            {recentComments.length === 0 ? (
-              <EmptyState text="暂无评论" icon="💬" size="sm" />
-            ) : (
-              recentComments.map((c) => (
-                <div key={c.id} className="recent-item">
-                  <div className="recent-item__content">
-                    <div className="recent-item__comment">{c.content.slice(0, 50)}{c.content.length > 50 ? '...' : ''}</div>
-                    <div className="recent-item__meta">
-                      <span>@{c.author_username}</span>
-                      <span>·</span>
-                      <span>{formatTime(c.created_at)}</span>
-                    </div>
-                  </div>
-                  <Link to={`/post/${c.post_slug}`} className="recent-item__post">
-                    {c.post_title?.slice(0, 15) || ''}
-                  </Link>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* 最新用户 */}
-        <div className="recent-card">
-          <div className="recent-card__header">
-            <h3 className="recent-card__title">最新注册</h3>
-            <Link to="/admin" className="recent-card__more">查看全部 →</Link>
-          </div>
-          <div className="recent-card__body">
-            {recentUsers.length === 0 ? (
-              <EmptyState text="暂无用户" icon="👥" size="sm" />
-            ) : (
-              recentUsers.map((u) => (
-                <div key={u.id} className="recent-item">
-                  <div className="recent-item__user">
-                    {u.avatar ? (
-                      <img src={u.avatar} alt="" className="recent-item__avatar" loading="lazy" />
-                    ) : (
-                      <div className="recent-item__avatar recent-item__avatar--placeholder">
-                        {u.username[0]?.toUpperCase()}
-                      </div>
-                    )}
-                    <div>
-                      <Link to={`/${u.username}`} className="recent-item__username">
-                        @{u.username}
+          {/* 最新文章 */}
+          <div className="recent-card">
+            <div className="recent-card__header">
+              <h3 className="recent-card__title">最新文章</h3>
+              <Link to="/admin" className="recent-card__more">查看全部 →</Link>
+            </div>
+            <div className="recent-card__body">
+              {recentPosts.length === 0 ? (
+                <EmptyState text="暂无文章" icon="📝" size="sm" />
+              ) : (
+                recentPosts.map((p) => (
+                  <div key={p.id} className="recent-item">
+                    <div className="recent-item__content">
+                      <Link to={`/post/${p.slug}`} className="recent-item__title">
+                        {p.title}
                       </Link>
-                      <div className="recent-item__meta">{formatDate(u.created_at)}</div>
+                      <div className="recent-item__meta">
+                        <span>@{p.author_username}</span>
+                        <span>·</span>
+                        <span>{formatTime(p.created_at)}</span>
+                      </div>
+                    </div>
+                    <div className="recent-item__stats">
+                      <span>👁 {formatNumber(p.views)}</span>
+                      <span>💬 {p.comments_count}</span>
                     </div>
                   </div>
-                  <span className={`role-badge ${u.role === 'admin' ? 'role-badge--admin' : ''}`}>
-                    {u.role === 'admin' ? '管理员' : '成员'}
-                  </span>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
+          {/* 最新评论 */}
+          <div className="recent-card">
+            <div className="recent-card__header">
+              <h3 className="recent-card__title">最新评论</h3>
+              <Link to="/admin" className="recent-card__more">查看全部 →</Link>
+            </div>
+            <div className="recent-card__body">
+              {recentComments.length === 0 ? (
+                <EmptyState text="暂无评论" icon="💬" size="sm" />
+              ) : (
+                recentComments.map((c) => (
+                  <div key={c.id} className="recent-item">
+                    <div className="recent-item__content">
+                      <div className="recent-item__comment">{c.content.slice(0, 50)}{c.content.length > 50 ? '...' : ''}</div>
+                      <div className="recent-item__meta">
+                        <span>@{c.author_username}</span>
+                        <span className="recent-item__dot">·</span>
+                        <span>{formatTime(c.created_at)}</span>
+                      </div>
+                    </div>
+                    <Link to={`/post/${c.post_slug}`} className="recent-item__post">
+                      {c.post_title?.slice(0, 15) || ''}
+                    </Link>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* 最新用户 */}
+          <div className="recent-card">
+            <div className="recent-card__header">
+              <h3 className="recent-card__title">最新注册</h3>
+              <Link to="/admin" className="recent-card__more">查看全部 →</Link>
+            </div>
+            <div className="recent-card__body">
+              {recentUsers.length === 0 ? (
+                <EmptyState text="暂无用户" icon="👥" size="sm" />
+              ) : (
+                recentUsers.map((u) => (
+                  <div key={u.id} className="recent-item">
+                    <div className="recent-item__user">
+                      {u.avatar ? (
+                        <img src={u.avatar} alt="" className="recent-item__avatar" loading="lazy" />
+                      ) : (
+                        <div className="recent-item__avatar recent-item__avatar--placeholder">
+                          {u.username[0]?.toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        <Link to={`/${u.username}`} className="recent-item__username">
+                          @{u.username}
+                        </Link>
+                        <div className="recent-item__meta">{formatDate(u.created_at)}</div>
+                      </div>
+                    </div>
+                    <span className={`role-badge ${u.role === 'admin' ? 'role-badge--admin' : ''}`}>
+                      {u.role === 'admin' ? '管理员' : '成员'}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       </div>
