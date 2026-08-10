@@ -978,9 +978,15 @@ export default function PostDetail() {
     }
   }
 
-  // Ctrl+M 选中内容 → 引用格式插入评论框
+  // Ctrl+M 选中内容 → 引用格式插入评论框（仅在非编辑器区域生效）
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // 检查焦点是否在编辑器内，如果是则跳过，让 MarkdownEditor 处理
+      const activeElement = document.activeElement
+      const isInEditor = activeElement?.classList?.contains?.('md-editor__textarea') ||
+                         activeElement?.classList?.contains?.('comment-form__textarea')
+      if (isInEditor) return
+
       if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'm') return
       const selection = window.getSelection()
       const text = selection?.toString().trim()
