@@ -14,8 +14,61 @@ function timeAgo(ts: number): string {
   return new Date(ts).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
 
+function computeStats(history: ReadingHistoryItem[]) {
+  if (history.length === 0) return null
+  const now = Date.now()
+  const dayMs = 86400000
+  const weekAgo = now - 7 * dayMs
+  const monthAgo = now - 30 * dayMs
+
+  const weekItems = history.filter((h) => h.visited_at >= weekAgo)
+  const monthItems = history.filter((h) => h.visited_at >= monthAgo)
+  const completed = history.filter((h) => (h.read_progress ?? 0) >= 95)
+  const avgProgress = history.reduce((s, h) => s + (h.read_progress ?? 0), 0) / history.length
+
+  // 按天分组（最近7天）
+  const dailyCounts: Array<{ day: string; count: number }> = []
+  for (let i = 6; i >= 0; i--) {
+    const dayStart = now - i * dayMs
+    const dayDate = new Date(dayStart)
+    const label = dayDate.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+    const count = history.filter((h) => {
+      const d = new Date(h.visited_at)
+      return d.getFullYear() === dayDate.getFullYear() &&
+        d.getMonth() === dayDate.getMonth() &&
+        d.getDate() === dayDate.getDate()
+    }).length
+    dailyCounts.push({ day: label, count })
+  }
+  const maxDaily = Math.max(...dailyCounts.map((d) => d.count), 1)
+
+  // 按作者分组
+  const authorMap = new Map<string, number>()
+  history.forEach((h) => {
+    if (h.author_username) {
+      authorMap.set(h.author_username, (authorMap.get(h.author_username) || 0) + 1)
+    }
+  })
+  const topAuthors = Array.from(authorMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+
+  return {
+    total: history.length,
+    weekCount: weekItems.length,
+    monthCount: monthItems.length,
+    completedCount: completed.length,
+    completionRate: Math.round((completed.length / history.length) * 100),
+    avgProgress: Math.round(avgProgress),
+    dailyCounts,
+    maxDaily,
+    topAuthors,
+  }
+}
+
 export default function History() {
   const { history, remove, clear } = useReadingHistory()
+  const stats = computeStats(history)
 
   return (
     <section className="posts-section">
@@ -36,6 +89,67 @@ export default function History() {
             </button>
           )}
         </div>
+
+        {stats && (
+          <div className="reading-stats">
+            <div className="reading-stats__cards">
+              <div className="reading-stats__card">
+                <span className="reading-stats__value">{stats.total}</span>
+                <span className="reading-stats__label">总阅读</span>
+              </div>
+              <div className="reading-stats__card">
+                <span className="reading-stats__value">{stats.weekCount}</span>
+                <span className="reading-stats__label">本周</span>
+              </div>
+              <div className="reading-stats__card">
+                <span className="reading-stats__value">{stats.completedCount}</span>
+                <span className="reading-stats__label">已读完</span>
+              </div>
+              <div className="reading-stats__card">
+                <span className="reading-stats__value">{stats.completionRate}%</span>
+                <span className="reading-stats__label">完成率</span>
+              </div>
+              <div className="reading-stats__card">
+                <span className="reading-stats__value">{stats.avgProgress}%</span>
+                <span className="reading-stats__label">平均进度</span>
+              </div>
+            </div>
+
+            {/* 7 天阅读趋势 */}
+            <div className="reading-stats__chart">
+              <h3 className="reading-stats__chart-title">近 7 天阅读趋势</h3>
+              <div className="reading-stats__bars">
+                {stats.dailyCounts.map((d) => (
+                  <div key={d.day} className="reading-stats__bar-group">
+                    <div className="reading-stats__bar-track">
+                      <div
+                        className="reading-stats__bar-fill"
+                        style={{ height: `${(d.count / stats.maxDaily) * 100}%` }}
+                      />
+                    </div>
+                    <span className="reading-stats__bar-value">{d.count}</span>
+                    <span className="reading-stats__bar-label">{d.day}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 常读作者 */}
+            {stats.topAuthors.length > 0 && (
+              <div className="reading-stats__authors">
+                <h3 className="reading-stats__chart-title">常读作者</h3>
+                <ul className="reading-stats__author-list">
+                  {stats.topAuthors.map(([name, count]) => (
+                    <li key={name} className="reading-stats__author-item">
+                      <Link to={`/${name}`} className="reading-stats__author-link">@{name}</Link>
+                      <span className="reading-stats__author-count">{count} 篇</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         {history.length === 0 ? (
           <div className="error-state">

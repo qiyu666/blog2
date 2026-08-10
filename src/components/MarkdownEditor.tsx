@@ -114,11 +114,36 @@ export default function MarkdownEditor({
     }
   }
 
-  /** Tab 缩进 + Markdown 快捷键 (Ctrl+B 加粗 / Ctrl+I 斜体 / Ctrl+K 插链接) */
+  /** Markdown 快捷键处理器 */
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    // Ctrl/Cmd + 字母组合
-    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
-      const k = e.key.toLowerCase()
+    const ctrl = e.ctrlKey || e.metaKey
+    const shift = e.shiftKey
+    const k = e.key.toLowerCase()
+
+    // Ctrl/Cmd + Shift + 字母组合
+    if (ctrl && shift && !e.altKey) {
+      if (k === 'k') {
+        // Ctrl+Shift+K：插入代码块
+        e.preventDefault()
+        insertCode()
+        return
+      }
+      if (k === 'i') {
+        // Ctrl+Shift+I：插入图片
+        e.preventDefault()
+        insertImage()
+        return
+      }
+      if (k === 'c') {
+        // Ctrl+Shift+C：插入代码块（另一种习惯）
+        e.preventDefault()
+        insertCode()
+        return
+      }
+    }
+
+    // Ctrl/Cmd + 字母（无 Shift/Alt）
+    if (ctrl && !e.altKey && !shift) {
       if (k === 'b') {
         e.preventDefault()
         wrapSelection('**', '**', '加粗文字')
@@ -134,19 +159,87 @@ export default function MarkdownEditor({
         insertLink()
         return
       }
+      if (k === 'q') {
+        // Ctrl+Q：引用
+        e.preventDefault()
+        linePrefix('> ')
+        return
+      }
+      if (k === 'u') {
+        // Ctrl+U：无序列表
+        e.preventDefault()
+        linePrefix('- ')
+        return
+      }
+      if (k === 'e') {
+        // Ctrl+E：行内代码
+        e.preventDefault()
+        wrapSelection('`', '`', '代码')
+        return
+      }
+      if (k === 's') {
+        // Ctrl+S：不拦截保存（交给父表单），但阻止浏览器默认保存页面
+        e.preventDefault()
+        // 派发自定义事件，父组件可监听保存草稿
+        window.dispatchEvent(new CustomEvent('md-editor:save'))
+        return
+      }
+      if (['1', '2', '3', '4', '5'].includes(k)) {
+        // Ctrl+1~5：标题 1~5
+        const level = Number(k)
+        const prefix = '#'.repeat(level) + ' '
+        e.preventDefault()
+        linePrefix(prefix)
+        return
+      }
     }
 
+    // Tab / Shift+Tab 缩进（支持多选行）
     if (e.key === 'Tab') {
       e.preventDefault()
       const ta = e.currentTarget
       const start = ta.selectionStart
       const end = ta.selectionEnd
       const before = value.slice(0, start)
+      const selected = value.slice(start, end)
       const after = value.slice(end)
-      onChange(before + '  ' + after)
-      requestAnimationFrame(() => {
-        ta.selectionStart = ta.selectionEnd = start + 2
-      })
+      if (!shift) {
+        // 缩进
+        if (selected.includes('\n')) {
+          // 多行：每行开头加 2 空格
+          const indented = selected.split('\n').map(l => '  ' + l).join('\n')
+          onChange(before + indented + after)
+          requestAnimationFrame(() => {
+            ta.selectionStart = start
+            ta.selectionEnd = start + indented.length
+          })
+        } else {
+          onChange(before + '  ' + after)
+          requestAnimationFrame(() => {
+            ta.selectionStart = ta.selectionEnd = start + 2
+          })
+        }
+      } else {
+        // Shift+Tab 取消缩进
+        if (selected.includes('\n')) {
+          const unindented = selected.split('\n').map(l => l.startsWith('  ') ? l.slice(2) : l).join('\n')
+          onChange(before + unindented + after)
+          requestAnimationFrame(() => {
+            ta.selectionStart = start
+            ta.selectionEnd = start + unindented.length
+          })
+        } else {
+          // 单行：向前删除最多 2 个空格
+          const leadingSpaces = before.match(/( {1,2})$/)
+          if (leadingSpaces) {
+            const n = leadingSpaces[0].length
+            onChange(before.slice(0, -n) + selected + after)
+            requestAnimationFrame(() => {
+              ta.selectionStart = ta.selectionEnd = start - n
+            })
+          }
+        }
+      }
     }
   }
 
@@ -154,22 +247,23 @@ export default function MarkdownEditor({
     <div className="md-editor">
       <div className="md-editor__toolbar">
           <div className="md-editor__group">
-            <button type="button" className="md-editor__btn" title="标题一" onClick={() => linePrefix('# ')}>H1</button>
-            <button type="button" className="md-editor__btn" title="标题二" onClick={() => linePrefix('## ')}>H2</button>
-            <button type="button" className="md-editor__btn" title="标题三" onClick={() => linePrefix('### ')}>H3</button>
-            <button type="button" className="md-editor__btn" title="标题四" onClick={() => linePrefix('#### ')}>H4</button>
-            <button type="button" className="md-editor__btn" title="标题五" onClick={() => linePrefix('##### ')}>H5</button>
+            <button type="button" className="md-editor__btn" title="标题一 (Ctrl+1)" onClick={() => linePrefix('# ')}>H1</button>
+            <button type="button" className="md-editor__btn" title="标题二 (Ctrl+2)" onClick={() => linePrefix('## ')}>H2</button>
+            <button type="button" className="md-editor__btn" title="标题三 (Ctrl+3)" onClick={() => linePrefix('### ')}>H3</button>
+            <button type="button" className="md-editor__btn" title="标题四 (Ctrl+4)" onClick={() => linePrefix('#### ')}>H4</button>
+            <button type="button" className="md-editor__btn" title="标题五 (Ctrl+5)" onClick={() => linePrefix('##### ')}>H5</button>
           </div>
           <div className="md-editor__group">
-            <button type="button" className="md-editor__btn" title="粗体" onClick={() => wrapSelection('**', '**', '粗体')}><strong>B</strong></button>
-            <button type="button" className="md-editor__btn" title="斜体" onClick={() => wrapSelection('*', '*', '斜体')}><em>I</em></button>
-            <button type="button" className="md-editor__btn" title="行内代码" onClick={insertCode}><code>{'</>'}</code></button>
+            <button type="button" className="md-editor__btn" title="粗体 (Ctrl+B)" onClick={() => wrapSelection('**', '**', '粗体')}><strong>B</strong></button>
+            <button type="button" className="md-editor__btn" title="斜体 (Ctrl+I)" onClick={() => wrapSelection('*', '*', '斜体')}><em>I</em></button>
+            <button type="button" className="md-editor__btn" title="行内代码 (Ctrl+E)" onClick={() => wrapSelection('`', '`', '代码')}><code>{'</>'}</code></button>
           </div>
           <div className="md-editor__group">
-            <button type="button" className="md-editor__btn" title="无序列表" onClick={() => linePrefix('- ')}>列表</button>
-            <button type="button" className="md-editor__btn" title="引用" onClick={() => linePrefix('> ')}>引用</button>
-            <button type="button" className="md-editor__btn" title="链接" onClick={insertLink}>链接</button>
-            <button type="button" className="md-editor__btn" title="图片" onClick={insertImage}>🖼 图片</button>
+            <button type="button" className="md-editor__btn" title="无序列表 (Ctrl+U)" onClick={() => linePrefix('- ')}>列表</button>
+            <button type="button" className="md-editor__btn" title="引用 (Ctrl+Q)" onClick={() => linePrefix('> ')}>引用</button>
+            <button type="button" className="md-editor__btn" title="链接 (Ctrl+K)" onClick={insertLink}>链接</button>
+            <button type="button" className="md-editor__btn" title="图片 (Ctrl+Shift+I)" onClick={insertImage}>🖼 图片</button>
+            <button type="button" className="md-editor__btn" title="代码块 (Ctrl+Shift+K)" onClick={insertCode}>{'{ }'}</button>
           </div>
           <div className="md-editor__tabs">
             <button

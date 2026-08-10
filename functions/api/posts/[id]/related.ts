@@ -1,9 +1,9 @@
 // GET /api/posts/[id]/related
-// 返回 4-6 篇相关文章（基于共享标签数，回退到同分类，再回退到最新文章）
+// 返回 4-6 篇相关文章
+// 综合评分：Jaccard 标签相似度 + 同分类加分 + 热度衰减 + 时效性
 // 仅返回已发布文章，排除当前文章
-// 返回字段：id, title, slug, excerpt, cover_image, category, created_at
 
-import { json } from '../../_helpers'
+import { json, cachedJson } from '../../_helpers'
 
 interface RelatedPost {
   id: number
@@ -14,6 +14,9 @@ interface RelatedPost {
   category: string
   tags: string
   created_at: string
+  views: number
+  likes_count: number
+  comments_count: number
 }
 
 export async function onRequestGet(context: {
@@ -25,7 +28,6 @@ export async function onRequestGet(context: {
   const slugOrId = params.id
 
   try {
-    // 解析当前文章：拿到 id、tags、category（支持 slug 或数字 id）
     const isNumeric = /^\d+$/.test(slugOrId)
     const current = await DB
       .prepare(
@@ -43,38 +45,52 @@ export async function onRequestGet(context: {
       .map((t) => t.trim())
       .filter(Boolean)
 
-    // 取候选池：同分类 + 最近 60 篇，足够计算标签重叠度
-    // 候选必须已发布且非当前文章
     const candidates = await DB.prepare(
-      `SELECT id, title, slug, excerpt, cover_image, category, tags, created_at
-       FROM posts
-       WHERE published = 1 AND id != ?
+      `SELECT p.id, p.title, p.slug, p.excerpt, p.cover_image, p.category, p.tags, p.created_at, p.views,
+              (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS likes_count,
+              (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comments_count
+       FROM posts p
+       WHERE p.published = 1 AND p.id != ?
        ORDER BY
-         CASE WHEN category = ? THEN 0 ELSE 1 END,
-         created_at DESC
-       LIMIT 60`
+         CASE WHEN p.category = ? THEN 0 ELSE 1 END,
+         p.created_at DESC
+       LIMIT 80`
     )
       .bind(current.id, current.category)
       .all<RelatedPost>()
 
     const pool = candidates.results || []
 
-    // 计算每篇候选与当前文章的标签重叠数
+    const now = Date.now()
     const scored = pool.map((p) => {
       const pTags = p.tags
         ? p.tags.split(',').map((t) => t.trim()).filter(Boolean)
         : []
-      const overlap = pTags.filter((t) => currentTags.includes(t)).length
-      const sameCategory = p.category === current.category ? 1 : 0
-      return { post: p, overlap, sameCategory }
+
+      // Jaccard 相似度：交集 / 并集
+      const intersection = pTags.filter((t) => currentTags.includes(t)).length
+      const union = new Set([...currentTags, ...pTags]).size
+      const jaccard = union > 0 ? intersection / union : 0
+
+      // 同分类加分
+      const sameCategory = p.category === current.category ? 0.3 : 0
+
+      // 热度分：点赞 + 评论 + 浏览量，归一化
+      const engagement = (p.likes_count || 0) * 3 + (p.comments_count || 0) * 2 + (p.views || 0) * 0.01
+      const hotness = Math.min(engagement / 50, 1) // 上限 1
+
+      // 时效衰减：30 天内满分，超过后逐月衰减
+      const ageMs = now - new Date(p.created_at + 'Z').getTime()
+      const ageDays = ageMs / 86400000
+      const recency = ageDays <= 30 ? 1 : Math.max(0, 1 - (ageDays - 30) / 365)
+
+      // 综合评分：Jaccard 40% + 同分类 15% + 热度 20% + 时效 25%
+      const score = jaccard * 0.4 + sameCategory * 0.15 + hotness * 0.2 + recency * 0.25
+
+      return { post: p, score }
     })
 
-    // 排序：标签重叠数 → 同分类 → 创建时间
-    scored.sort((a, b) => {
-      if (b.overlap !== a.overlap) return b.overlap - a.overlap
-      if (b.sameCategory !== a.sameCategory) return b.sameCategory - a.sameCategory
-      return new Date(b.post.created_at).getTime() - new Date(a.post.created_at).getTime()
-    })
+    scored.sort((a, b) => b.score - a.score)
 
     const related = scored.slice(0, 6).map((s) => ({
       id: s.post.id,
@@ -86,7 +102,7 @@ export async function onRequestGet(context: {
       created_at: s.post.created_at,
     }))
 
-    return json(related)
+    return cachedJson(related, { browserMaxAge: 60, cdnMaxAge: 600, swr: 300 })
   } catch (err) {
     if (String(err).includes('no such table')) {
       return json([])

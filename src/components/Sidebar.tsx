@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import type { Post } from '../types';
 
@@ -22,6 +23,12 @@ export default function Sidebar({ posts }: { posts: Post[] }) {
       });
     });
     setCategories(Array.from(catMap.entries()).map(([name, count]) => ({ name, count })));
+  }, [posts]);
+
+  const hotPosts = useMemo(() => {
+    return [...posts]
+      .sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0))
+      .slice(0, 5);
   }, [posts]);
 
   return (
@@ -49,18 +56,35 @@ export default function Sidebar({ posts }: { posts: Post[] }) {
               <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
             </svg>
           </a>
-          <a href="#" className="sidebar__social-link" title="RSS">
+          <a href="/api/feed" target="_blank" rel="noopener noreferrer" className="sidebar__social-link" title="RSS 订阅">
             <svg viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+              <path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27V4.44m0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93V10.1z"/>
             </svg>
           </a>
-          <a href="#" className="sidebar__social-link" title="邮箱">
+          <a href="mailto:hello@marginalia.blog" className="sidebar__social-link" title="联系邮箱">
             <svg viewBox="0 0 24 24" fill="currentColor">
               <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
             </svg>
           </a>
         </div>
       </div>
+
+      {hotPosts.length > 0 && (
+        <div className="sidebar__section">
+          <h4 className="sidebar__section-title">🔥 热门文章</h4>
+          <ul className="sidebar__hot-list">
+            {hotPosts.map((p, idx) => (
+              <li key={p.id} className="sidebar__hot-item">
+                <span className="sidebar__hot-rank">{idx + 1}</span>
+                <Link to={`/post/${p.slug}`} className="sidebar__hot-link">
+                  <span className="sidebar__hot-title">{p.title}</span>
+                  <span className="sidebar__hot-likes">❤️ {p.likes_count || 0}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="sidebar__section">
         <h4 className="sidebar__section-title">分类</h4>

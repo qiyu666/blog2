@@ -92,7 +92,7 @@ export default function Footer() {
             <div className="site-footer__col-title">{t('footer.colOther')}</div>
             <ul className="site-footer__list">
               <li><a href="https://github.com/qiyu666" target="_blank" rel="noreferrer">GitHub</a></li>
-              <li><a href="/feed.xml" target="_blank" rel="noreferrer">RSS</a></li>
+              <li><a href="/api/feed" target="_blank" rel="noreferrer noopener">RSS 订阅</a></li>
               <li><a href="/bug-report">{t('footer.submitBug')}</a></li>
               <li><a href="mailto:hello@marginalia.blog">{t('footer.contact')}</a></li>
             </ul>

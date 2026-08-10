@@ -13,7 +13,7 @@ export interface ReadingHistoryItem {
   read_progress?: number // 0-100
 }
 
-function load(): ReadingHistoryItem[] {
+export function load(): ReadingHistoryItem[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return []

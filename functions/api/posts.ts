@@ -6,7 +6,7 @@
 //   body.published = 0  → create as draft (default 1)
 //   body.is_pinned / is_featured → admin only (default 0)
 
-import { json, error, slugify, uniqueSlug } from './_helpers'
+import { json, error, slugify, uniqueSlug, cachedJson } from './_helpers'
 import { getSession, cleanText } from './_auth'
 
 interface PostInput {
@@ -79,7 +79,11 @@ export async function onRequestGet(context: {
       .bind(...binds)
       .all()
 
-    return json(result.results)
+    // 草稿列表涉及个人数据，不缓存；公开文章列表可缓存
+    if (status === 'draft') {
+      return json(result.results)
+    }
+    return cachedJson(result.results, { browserMaxAge: 20, cdnMaxAge: 300, swr: 120 })
   } catch (err) {
     if (String(err).includes('no such table')) {
       return json([])

@@ -7,27 +7,32 @@ import SearchPalette from './SearchPalette';
 import NotificationsMenu from './NotificationsMenu';
 import LanguageSwitcher from './LanguageSwitcher';
 
-type Theme = 'light' | 'dark';
+type Theme = 'light' | 'dark' | 'auto';
+
+function resolveTheme(theme: Theme): 'light' | 'dark' {
+  if (theme === 'auto') {
+    if (typeof window !== 'undefined' && window.matchMedia &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+    return 'light';
+  }
+  return theme;
+}
+
+function applyTheme(theme: Theme) {
+  const resolved = resolveTheme(theme);
+  document.documentElement.setAttribute('data-theme', resolved);
+}
 
 function getInitialTheme(): Theme {
   try {
     const saved = localStorage.getItem('theme');
-    if (saved === 'light' || saved === 'dark') return saved;
+    if (saved === 'light' || saved === 'dark' || saved === 'auto') return saved;
   } catch {
     // ignore
   }
-  if (
-    typeof window !== 'undefined' &&
-    window.matchMedia &&
-    window.matchMedia('(prefers-color-scheme: dark)').matches
-  ) {
-    return 'dark';
-  }
-  return 'light';
-}
-
-function applyTheme(theme: Theme) {
-  document.documentElement.setAttribute('data-theme', theme);
+  return 'auto';
 }
 
 export default function Header() {
@@ -65,6 +70,15 @@ export default function Header() {
     setTheme(initial);
   }, []);
 
+  // auto 模式下：监听系统主题变化，实时切换
+  useEffect(() => {
+    if (theme !== 'auto') return;
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => applyTheme('auto');
+    mql.addEventListener?.('change', onChange);
+    return () => mql.removeEventListener?.('change', onChange);
+  }, [theme]);
+
   useEffect(() => {
     function onScroll() {
       setScrolled(window.scrollY > 12);
@@ -74,8 +88,9 @@ export default function Header() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  function toggleTheme() {
-    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+  function cycleTheme() {
+    const order: Theme[] = ['light', 'dark', 'auto'];
+    const next = order[(order.indexOf(theme) + 1) % order.length];
     applyTheme(next);
     setTheme(next);
     try {
@@ -83,6 +98,12 @@ export default function Header() {
     } catch {
       // ignore
     }
+  }
+
+  function getThemeIcon(): string {
+    if (theme === 'light') return '☀️';
+    if (theme === 'dark') return '🌙';
+    return '🖥️';
   }
 
   const handleLogout = async () => {
@@ -109,6 +130,11 @@ export default function Header() {
           <NavLink to="/history" className="nav__link">
             {t('nav.history')}
           </NavLink>
+          {user && (
+            <NavLink to="/following" className="nav__link">
+              关注
+            </NavLink>
+          )}
           {user && (
             <NavLink to="/favorites" className="nav__link">
               {t('nav.favorites')}
@@ -159,11 +185,15 @@ export default function Header() {
           <button
             type="button"
             className="nav__theme-toggle"
-            onClick={toggleTheme}
-            title={theme === 'dark' ? t('common.toggleLight') : t('common.toggleDark')}
+            onClick={cycleTheme}
+            title={
+              theme === 'light' ? '浅色模式，点击切换到深色' :
+              theme === 'dark' ? '深色模式，点击切换到跟随系统' :
+              '跟随系统，点击切换到浅色'
+            }
             aria-label={t('common.toggleTheme')}
           >
-            {theme === 'dark' ? '☀️' : '🌙'}
+            {getThemeIcon()}
           </button>
         </nav>
 
@@ -172,10 +202,15 @@ export default function Header() {
           <button
             type="button"
             className="nav__theme-toggle"
-            onClick={toggleTheme}
+            onClick={cycleTheme}
+            title={
+              theme === 'light' ? '浅色 → 深色' :
+              theme === 'dark' ? '深色 → 跟随系统' :
+              '跟随系统 → 浅色'
+            }
             aria-label={t('common.toggleTheme')}
           >
-            {theme === 'dark' ? '☀️' : '🌙'}
+            {getThemeIcon()}
           </button>
           <button
             type="button"
@@ -213,6 +248,11 @@ export default function Header() {
             <NavLink to="/history" className="mobile-menu__link">
               {t('nav.history')}
             </NavLink>
+            {user && (
+              <NavLink to="/following" className="mobile-menu__link">
+                关注
+              </NavLink>
+            )}
             {user && (
               <NavLink to="/favorites" className="mobile-menu__link">
                 {t('nav.favorites')}

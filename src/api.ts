@@ -892,6 +892,29 @@ export async function searchUsers(query: string): Promise<Array<{ id: number; us
   return res.json()
 }
 
+// ===== 关注 Feed =====
+export interface FeedPost {
+  id: number
+  title: string
+  slug: string
+  excerpt: string
+  category: string
+  cover_image: string | null
+  created_at: string
+  author_username: string
+  author_display_name: string | null
+  author_avatar: string | null
+  views: number
+  likes_count: number
+  comments_count: number
+}
+export async function getFollowingFeed(cursor?: string): Promise<{ posts: FeedPost[]; has_more: boolean; next_cursor: string | null }> {
+  const params = new URLSearchParams()
+  if (cursor) params.set('cursor', cursor)
+  const qs = params.toString()
+  return request(`/api/following/feed${qs ? `?${qs}` : ''}`, { credentials: 'same-origin' })
+}
+
 // ===== 批量操作（文章） =====
 export async function batchPostAction(
   action: 'delete' | 'publish' | 'unpublish' | 'pin' | 'unpin',

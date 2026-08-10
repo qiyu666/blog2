@@ -38,6 +38,7 @@ const SeriesManage = lazy(() => import('./pages/SeriesManage'))
 const Links = lazy(() => import('./pages/Links'))
 const Unsubscribe = lazy(() => import('./pages/Unsubscribe'))
 const SharedPost = lazy(() => import('./pages/SharedPost'))
+const FollowingFeed = lazy(() => import('./pages/FollowingFeed'))
 
 export default function App() {
   return (
@@ -134,6 +135,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Security />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/following"
+            element={
+              <ProtectedRoute>
+                <FollowingFeed />
               </ProtectedRoute>
             }
           />

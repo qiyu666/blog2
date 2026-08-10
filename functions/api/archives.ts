@@ -1,6 +1,6 @@
 // GET /api/archives
 // 返回文章归档（按年-月分组，用于归档页面展示）
-import { json } from './_helpers'
+import { cachedJson } from './_helpers'
 
 export async function onRequestGet(context: { env: { DB: D1Database } }) {
   const rows = await context.env.DB
@@ -32,7 +32,7 @@ export async function onRequestGet(context: { env: { DB: D1Database } }) {
     }))
     .sort((a, b) => b.ym.localeCompare(a.ym))
 
-  return json({ archives, total: rows.results.length })
+  return cachedJson({ archives, total: rows.results.length }, { browserMaxAge: 60, cdnMaxAge: 900, swr: 600 })
 }
 
 export async function onRequestOptions() {

@@ -2,7 +2,7 @@
 // 公开分类列表接口，供发帖/编辑时选择分类使用
 // GET → 返回所有分类（含文章数），无需登录
 
-import { json, error, slugify } from './_helpers'
+import { json, error, slugify, cachedJson } from './_helpers'
 
 export async function onRequestGet(context: {
   request: Request
@@ -55,7 +55,7 @@ export async function onRequestGet(context: {
        FROM categories c
        ORDER BY c.sort_order ASC, c.name ASC`
     ).all()
-    return json(rows.results)
+    return cachedJson(rows.results, { browserMaxAge: 120, cdnMaxAge: 1800, swr: 600 })
   } catch (err) {
     return error('获取分类失败：' + String(err), 500)
   }

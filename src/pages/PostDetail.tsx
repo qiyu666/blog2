@@ -40,7 +40,7 @@ import {
 } from '../api'
 import type { PostNeighbor, RelatedPost, PostStats } from '../api'
 import { useAuth } from '../auth/AuthContext'
-import { useReadingHistory } from '../hooks/useReadingHistory'
+import { useReadingHistory, load as loadHistory } from '../hooks/useReadingHistory'
 import SEO, { setMetaTag, setJsonLd, cleanupDynamicMeta } from '../components/SEO'
 import PostSidebar from '../components/PostSidebar'
 import TableOfContents from '../components/TableOfContents'
@@ -99,7 +99,7 @@ export function renderMarkdown(
     if (images) {
       processed = processed
         .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) =>
-          stash(`<img src="${url}" alt="${alt}" loading="lazy" style="max-width:100%;border-radius:8px;margin:0.5rem 0;" />`),
+          stash(`<img src="${url}" alt="${alt}" loading="lazy" class="lazy-load" onerror="this.classList.add('loaded')" onload="this.classList.add('loaded')" style="max-width:100%;border-radius:8px;margin:0.5rem 0;" />`),
         )
     }
     processed = processed
@@ -328,6 +328,9 @@ export default function PostDetail() {
   const [postStats, setPostStats] = useState<PostStats | null>(null)
 
   const [readProgress, setReadProgress] = useState(0)
+  // 继续阅读：上次阅读位置恢复
+  const [resumeProgress, setResumeProgress] = useState<number | null>(null)
+  const [showResumeTip, setShowResumeTip] = useState(false)
 
   const [authorProfile, setAuthorProfile] = useState<{
     social_github?: string
@@ -352,6 +355,28 @@ export default function PostDetail() {
   useEffect(() => {
     localStorage.setItem('postFontScale', String(fontScale))
   }, [fontScale])
+
+  // 字体族调节（衬线/无衬线/等宽/系统默认）
+  type FontFamily = 'system' | 'serif' | 'sans' | 'mono'
+  const [fontFamily, setFontFamily] = useState<FontFamily>(() => {
+    const saved = localStorage.getItem('postFontFamily') as FontFamily
+    return (saved === 'system' || saved === 'serif' || saved === 'sans' || saved === 'mono') ? saved : 'system'
+  })
+  useEffect(() => {
+    localStorage.setItem('postFontFamily', fontFamily)
+  }, [fontFamily])
+  const fontFamilyCSS: Record<FontFamily, string> = {
+    system: 'var(--font-system, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif)',
+    sans: '"PingFang SC", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif',
+    serif: '"Songti SC", "SimSun", Georgia, "Times New Roman", serif',
+    mono: '"JetBrains Mono", "Fira Code", Consolas, "Courier New", monospace',
+  }
+  const fontFamilyLabels: Record<FontFamily, string> = {
+    system: '默认',
+    sans: '无衬线',
+    serif: '衬线',
+    mono: '等宽',
+  }
 
   // 上一篇/下一篇导航
   const [neighbors, setNeighbors] = useState<{ previous: PostNeighbor | null; next: PostNeighbor | null }>({ previous: null, next: null })
@@ -382,6 +407,15 @@ export default function PostDetail() {
         setPost(data)
         setToc(extractToc(data.content))
         setLoading(false)
+
+        // 检查本地历史中是否有未完成的阅读进度
+        const history = loadHistory()
+        const prev = history.find((h) => h.slug === data.slug)
+        if (prev && prev.read_progress != null && prev.read_progress >= 15 && prev.read_progress < 95) {
+          setResumeProgress(Math.round(prev.read_progress))
+          setShowResumeTip(true)
+        }
+
         recordVisit({
           slug: data.slug,
           title: data.title,
@@ -438,6 +472,63 @@ export default function PostDetail() {
     const t = setTimeout(() => updateProgress(slug, Math.round(readProgress)), 800)
     return () => clearTimeout(t)
   }, [slug, readProgress, updateProgress])
+
+  // 点击进度条跳转到对应位置
+  function handleProgressClick(e: React.MouseEvent<HTMLDivElement>) {
+    const el = document.querySelector('.article')
+    if (!el) return
+    const total = el.scrollHeight - window.innerHeight
+    if (total <= 0) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const ratio = (e.clientX - rect.left) / rect.width
+    const targetScroll = ratio * total
+    const articleTop = el.getBoundingClientRect().top + window.scrollY
+    window.scrollTo({ top: articleTop + targetScroll, behavior: 'smooth' })
+  }
+
+  // 恢复到上次阅读位置
+  function handleResumeReading() {
+    if (resumeProgress == null) return
+    const el = document.querySelector('.article')
+    if (!el) return
+    const total = el.scrollHeight - window.innerHeight
+    if (total <= 0) return
+    const targetScroll = (resumeProgress / 100) * total
+    const articleTop = el.getBoundingClientRect().top + window.scrollY
+    window.scrollTo({ top: articleTop + targetScroll, behavior: 'smooth' })
+    setShowResumeTip(false)
+  }
+
+  // 计算 TOC 各章节在进度条上的百分比位置
+  function computeTocMarkers(): Array<{ id: string; text: string; pct: number }> {
+    if (!post || toc.length === 0) return []
+    const el = document.querySelector('.article')
+    if (!el) return []
+    const articleTop = el.getBoundingClientRect().top + window.scrollY
+    const total = el.scrollHeight - window.innerHeight
+    if (total <= 0) return []
+    return toc
+      .map((item) => {
+        const headingEl = document.getElementById(item.id)
+        if (!headingEl) return null
+        const headingTop = headingEl.getBoundingClientRect().top + window.scrollY
+        const offset = headingTop - articleTop
+        const pct = Math.min(Math.max((offset / total) * 100, 0), 100)
+        return { id: item.id, text: item.text, pct }
+      })
+      .filter((v): v is { id: string; text: string; pct: number } => v != null)
+  }
+  const [tocMarkers, setTocMarkers] = useState<Array<{ id: string; text: string; pct: number }>>([])
+  // 监听 TOC 和 post 变化，更新章节标记位置
+  useEffect(() => {
+    if (!post || toc.length === 0) { setTocMarkers([]); return }
+    // 等待 DOM 渲染完毕
+    const t = setTimeout(() => setTocMarkers(computeTocMarkers()), 100)
+    const onResize = () => setTocMarkers(computeTocMarkers())
+    window.addEventListener('resize', onResize)
+    return () => { clearTimeout(t); window.removeEventListener('resize', onResize) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post, toc])
 
   useEffect(() => {
     loadPost()
@@ -658,6 +749,37 @@ export default function PostDetail() {
     })
   }, [post])
 
+  // 图片懒加载 + 模糊占位
+  useEffect(() => {
+    if (!post) return
+    const lazyImages = Array.from(document.querySelectorAll<HTMLImageElement>('.article__body img.lazy-load'))
+    if (lazyImages.length === 0) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const img = entry.target as HTMLImageElement
+            if (!img.dataset.loaded) {
+              img.dataset.loaded = 'true'
+              img.style.opacity = '1'
+              observer.unobserve(img)
+            }
+          }
+        })
+      },
+      { rootMargin: '50px 0px', threshold: 0.01 }
+    )
+
+    lazyImages.forEach((img) => {
+      observer.observe(img)
+    })
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [post])
+
   // 图片灯箱：为文章正文内所有图片绑定点击事件
   useEffect(() => {
     if (!post) return
@@ -855,6 +977,44 @@ export default function PostDetail() {
       setShowMentions(false)
     }
   }
+
+  // Ctrl+P 选中内容 → 引用格式插入评论框
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'p') return
+      const selection = window.getSelection()
+      const text = selection?.toString().trim()
+      if (!text) return
+      e.preventDefault()
+
+      const isInArticleBody = selection?.anchorNode
+        ? document.querySelector('.article__body')?.contains(selection.anchorNode)
+        : false
+      if (!isInArticleBody) return
+
+      // 格式：每行加 > 前缀
+      const quoted = text.split('\n').map(line => `> ${line}`).join('\n')
+      const currentText = commentText.trim()
+        ? commentText + (commentText.endsWith('\n') ? '' : '\n\n')
+        : ''
+      setCommentText(currentText + quoted + '\n\n')
+
+      // 滚动到评论区并聚焦
+      const commentsSection = document.getElementById('comments')
+      if (commentsSection) {
+        commentsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+      setTimeout(() => {
+        const textarea = document.querySelector('.comment-form__textarea') as HTMLTextAreaElement
+        if (textarea) {
+          textarea.focus()
+          textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+        }
+      }, 400)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [commentText])
 
   async function handleSubmitComment(e: FormEvent) {
     e.preventDefault()
@@ -1136,6 +1296,40 @@ export default function PostDetail() {
                     回复
                   </button>
                 )}
+                {user && (
+                  <button
+                    type="button"
+                    className="comment__action"
+                    onClick={() => {
+                      // 引用：把评论内容以 Markdown > 格式插入主评论框
+                      const quoted = c.content
+                        .split('\n')
+                        .map(line => `> ${line}`)
+                        .join('\n')
+                      const header = `> @${c.author_username} 说道：\n${quoted}`
+                      const current = commentText.trim()
+                        ? commentText + (commentText.endsWith('\n') ? '' : '\n\n')
+                        : ''
+                      setCommentText(current + header + '\n\n')
+                      setReplyTo(null)
+                      // 滚动到评论区并聚焦
+                      const commentsSection = document.getElementById('comments')
+                      if (commentsSection) {
+                        commentsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }
+                      setTimeout(() => {
+                        const textarea = document.querySelector('.comment-form__textarea') as HTMLTextAreaElement
+                        if (textarea) {
+                          textarea.focus()
+                          textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+                        }
+                      }, 400)
+                    }}
+                    title="引用这条评论"
+                  >
+                    引用
+                  </button>
+                )}
                 {canEdit && !isEditing && (
                   <button
                     type="button"
@@ -1213,7 +1407,43 @@ export default function PostDetail() {
   return (
     <>
     {post && (
-      <div className="reading-progress" style={{ width: `${readProgress}%` }} />
+      <>
+        <div className="reading-progress-wrap" onClick={handleProgressClick} title="点击跳转到对应位置">
+          {/* 章节标记 */}
+          {tocMarkers.map((m) => (
+            <span
+              key={m.id}
+              className="reading-progress__marker"
+              style={{ left: `${m.pct}%` }}
+              title={m.text}
+            />
+          ))}
+          {/* 进度条前景 */}
+          <div className="reading-progress" style={{ width: `${readProgress}%` }} />
+        </div>
+        {/* 继续阅读提示 */}
+        {showResumeTip && resumeProgress != null && (
+          <div className="resume-tip" role="alert">
+            <span className="resume-tip__text">上次读到 {resumeProgress}%，是否继续阅读？</span>
+            <div className="resume-tip__actions">
+              <button
+                type="button"
+                className="btn-primary btn-sm"
+                onClick={handleResumeReading}
+              >
+                继续阅读
+              </button>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                onClick={() => setShowResumeTip(false)}
+              >
+                忽略
+              </button>
+            </div>
+          </div>
+        )}
+      </>
     )}
     <div className="post-layout">
       <PostSidebar post={post} />
@@ -1228,7 +1458,7 @@ export default function PostDetail() {
           <Link to="/" className="back-link">
             ← 返回论坛
           </Link>
-          <div className="article__font-controls" role="group" aria-label="字体大小">
+          <div className="article__font-controls" role="group" aria-label="字体设置">
             <button
               type="button"
               className="article__font-btn"
@@ -1244,6 +1474,19 @@ export default function PostDetail() {
               onClick={() => setFontScale((s) => Math.min(160, s + 10))}
               disabled={fontScale >= 160}
             >A+</button>
+            <span className="article__font-divider" />
+            <button
+              type="button"
+              className="article__font-btn article__font-btn--cycle"
+              title={`切换字体族：${fontFamilyLabels[fontFamily]}`}
+              onClick={() => {
+                const order: FontFamily[] = ['system', 'sans', 'serif', 'mono']
+                const next = order[(order.indexOf(fontFamily) + 1) % order.length]
+                setFontFamily(next)
+              }}
+            >
+              {fontFamilyLabels[fontFamily]}
+            </button>
           </div>
         </div>
 
@@ -1300,7 +1543,10 @@ export default function PostDetail() {
 
         <div
           className="article__body"
-          style={{ fontSize: `${fontScale}%` }}
+          style={{
+            fontSize: `${fontScale}%`,
+            fontFamily: fontFamilyCSS[fontFamily],
+          }}
           dangerouslySetInnerHTML={{ __html: renderMarkdown(post.content) }}
         />
 
