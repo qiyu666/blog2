@@ -978,51 +978,7 @@ export default function PostDetail() {
     }
   }
 
-  // Ctrl+M 选中内容 → 引用格式插入评论框（仅在非编辑器区域生效）
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      // 检查焦点是否在编辑器内，如果是则跳过，让 MarkdownEditor 处理
-      const activeElement = document.activeElement
-      const isInEditor = activeElement?.classList?.contains?.('md-editor__textarea') ||
-                         activeElement?.classList?.contains?.('comment-form__textarea')
-      if (isInEditor) return
-
-      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'm') return
-      const selection = window.getSelection()
-      const text = selection?.toString().trim()
-      if (!text) return
-      e.preventDefault()
-
-      const isInArticleBody = selection?.anchorNode
-        ? document.querySelector('.article__body')?.contains(selection.anchorNode)
-        : false
-      if (!isInArticleBody) return
-
-      // 格式：每行加 > 前缀
-      const quoted = text.split('\n').map(line => `> ${line}`).join('\n')
-      const currentText = commentText.trim()
-        ? commentText + (commentText.endsWith('\n') ? '' : '\n\n')
-        : ''
-      setCommentText(currentText + quoted + '\n\n')
-
-      // 滚动到评论区并聚焦
-      const commentsSection = document.getElementById('comments')
-      if (commentsSection) {
-        commentsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
-      setTimeout(() => {
-        const textarea = document.querySelector('.comment-form__textarea') as HTMLTextAreaElement
-        if (textarea) {
-          textarea.focus()
-          textarea.setSelectionRange(textarea.value.length, textarea.value.length)
-        }
-      }, 400)
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [commentText])
-
-  async function handleSubmitComment(e: FormEvent) {
+    async function handleSubmitComment(e: FormEvent) {
     e.preventDefault()
     if (!post || !user) return
     const content = commentText.trim()
