@@ -45,32 +45,34 @@ export default function PostCard({ post, index = 0 }: { post: PostCardData; inde
           <img src={post.cover_image} alt={post.title} loading="lazy" />
         )}
       </Link>
-      <span className="post-card__category">{post.category}</span>
-      {readItem && (
-        <span className="post-card__read-mark" title={timeAgo(readItem.visited_at)}>
-          ✓ 已读{readItem.read_progress ? ` ${readItem.read_progress}%` : ''}
-        </span>
-      )}
-      {(isPinned || isFeatured) && (
-        <div className="post-card__badges">
-          {isPinned && <span className="post-badge post-badge--pinned">置顶</span>}
-          {isFeatured && <span className="post-badge post-badge--featured">精华</span>}
+      <div className="post-card__body">
+        <span className="post-card__category">{post.category}</span>
+        {readItem && (
+          <span className="post-card__read-mark" title={timeAgo(readItem.visited_at)}>
+            ✓ 已读{readItem.read_progress ? ` ${readItem.read_progress}%` : ''}
+          </span>
+        )}
+        {(isPinned || isFeatured) && (
+          <div className="post-card__badges">
+            {isPinned && <span className="post-badge post-badge--pinned">置顶</span>}
+            {isFeatured && <span className="post-badge post-badge--featured">精华</span>}
+          </div>
+        )}
+        <h3 className="post-card__title">
+          <Link to={`/post/${post.slug}`}>{post.title}</Link>
+        </h3>
+        <p className="post-card__excerpt">{post.excerpt}</p>
+        <div className="post-card__meta">
+          <Link to={`/${author}`} className="post-card__author">{author}</Link>
+          <span className="post-card__divider"></span>
+          <span>{formatDate(post.created_at)}</span>
+          <span className="post-card__divider"></span>
+          <span className="post-card__read-time">约 {readTime} 分钟</span>
+          <span className="post-card__stats">
+            <span className="post-card__stat" title="点赞">♡ {post.likes_count ?? 0}</span>
+            <span className="post-card__stat" title="评论">▭ {post.comments_count ?? 0}</span>
+          </span>
         </div>
-      )}
-      <h3 className="post-card__title">
-        <Link to={`/post/${post.slug}`}>{post.title}</Link>
-      </h3>
-      <p className="post-card__excerpt">{post.excerpt}</p>
-      <div className="post-card__meta">
-        <Link to={`/${author}`} className="post-card__author">{author}</Link>
-        <span className="post-card__divider"></span>
-        <span>{formatDate(post.created_at)}</span>
-        <span className="post-card__divider"></span>
-        <span className="post-card__read-time">约 {readTime} 分钟</span>
-        <span className="post-card__stats">
-          <span className="post-card__stat" title="点赞">♡ {post.likes_count ?? 0}</span>
-          <span className="post-card__stat" title="评论">▭ {post.comments_count ?? 0}</span>
-        </span>
       </div>
     </article>
   );
