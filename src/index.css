@@ -1630,7 +1630,7 @@ input, textarea, select {
   z-index: 2;
 }
 
-.post-badge {
+.post-card__badges .post-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1647,14 +1647,14 @@ input, textarea, select {
   border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
-.post-badge--pinned {
+.post-card__badges .post-badge--pinned {
   background: var(--gradient-btn);
   color: white;
   border: none;
   box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
 }
 
-.post-badge--featured {
+.post-card__badges .post-badge--featured {
   background: linear-gradient(135deg, rgba(124, 58, 237, 0.95) 0%, rgba(219, 39, 119, 0.95) 100%);
   color: white;
   border: none;
@@ -6937,7 +6937,7 @@ input, textarea, select {
   flex-wrap: wrap;
 }
 
-.post-badge {
+.admin-post-badges .post-badge {
   display: inline-block;
   padding: 2px 8px;
   border-radius: 6px;
@@ -6945,12 +6945,12 @@ input, textarea, select {
   font-weight: 500;
 }
 
-.post-badge--pinned {
+.admin-post-badges .post-badge--pinned {
   background: rgba(232, 89, 12, 0.1);
   color: var(--accent);
 }
 
-.post-badge--featured {
+.admin-post-badges .post-badge--featured {
   background: rgba(139, 92, 246, 0.1);
   color: var(--violet);
 }
