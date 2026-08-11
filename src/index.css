@@ -1543,12 +1543,6 @@ input, textarea, select {
   margin-bottom: var(--space-xs);
 }
 
-.posts-grid .post-card__badges {
-  position: static;
-  transform: none;
-  margin-bottom: var(--space-xs);
-}
-
 .post-card {
   display: flex;
   flex-direction: column;
@@ -9939,12 +9933,6 @@ a.profile-stat {
   margin-bottom: var(--space-xs);
 }
 
-.post-list .post-card__badges {
-  position: static;
-  transform: none;
-  margin-bottom: var(--space-xs);
-}
-
 .post-list .post-card__body {
   flex: 1;
   min-width: 0;
@@ -11309,17 +11297,6 @@ a.profile-stat {
 
 .form__saved-hint--visible {
   opacity: 1;
-}
-
-/* ============================================================
-   帖子徽章 (置顶 / 精华)
-   ============================================================ */
-.post-card__badges {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: var(--space-xs);
-  vertical-align: middle;
 }
 
 .post-badge {

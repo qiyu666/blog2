@@ -44,6 +44,12 @@ export default function PostCard({ post, index = 0 }: { post: PostCardData; inde
         {post.cover_image && (
           <img src={post.cover_image} alt={post.title} loading="lazy" />
         )}
+        {(isPinned || isFeatured) && (
+          <div className="post-card__badges">
+            {isPinned && <span className="post-badge post-badge--pinned">置顶</span>}
+            {isFeatured && <span className="post-badge post-badge--featured">精华</span>}
+          </div>
+        )}
       </Link>
       <div className="post-card__body">
         <span className="post-card__category">{post.category}</span>
@@ -51,12 +57,6 @@ export default function PostCard({ post, index = 0 }: { post: PostCardData; inde
           <span className="post-card__read-mark" title={timeAgo(readItem.visited_at)}>
             ✓ 已读{readItem.read_progress ? ` ${readItem.read_progress}%` : ''}
           </span>
-        )}
-        {(isPinned || isFeatured) && (
-          <div className="post-card__badges">
-            {isPinned && <span className="post-badge post-badge--pinned">置顶</span>}
-            {isFeatured && <span className="post-badge post-badge--featured">精华</span>}
-          </div>
         )}
         <h3 className="post-card__title">
           <Link to={`/post/${post.slug}`}>{post.title}</Link>
