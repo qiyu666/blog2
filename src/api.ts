@@ -3,7 +3,6 @@ import type {
   PostInput,
   User,
   Comment,
-  Annotation,
   LikeStatus,
   Message,
   SearchResult,
@@ -227,28 +226,6 @@ export async function editComment(id: number, content: string): Promise<Comment>
   return request<Comment>(`/api/comments/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ content }),
-  });
-}
-
-// ===== Annotations =====
-export async function getAnnotations(postSlug: string): Promise<Annotation[]> {
-  return request<Annotation[]>(`/api/posts/${postSlug}/annotations`);
-}
-
-export async function createAnnotation(
-  postSlug: string,
-  payload: {
-    element_hash: string
-    element_index: number
-    element_type: string
-    element_text: string
-    content: string
-    parent_id?: number | null
-  }
-): Promise<Annotation> {
-  return request<Annotation>(`/api/posts/${postSlug}/annotations`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
   });
 }
 

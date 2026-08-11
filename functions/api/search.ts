@@ -24,7 +24,7 @@ export async function onRequestGet(context: {
     const result = await env.DB
       .prepare(
         `SELECT p.id, p.title, p.slug, p.excerpt, p.category, p.cover_image,
-          p.views, p.created_at, p.author_id,
+          p.views, p.created_at, p.author_id, p.is_pinned, p.is_featured, p.content,
           u.username AS author_username,
           (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS likes_count,
           (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comments_count,

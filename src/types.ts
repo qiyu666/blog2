@@ -109,6 +109,9 @@ export interface SearchResult {
   likes_count?: number;
   comments_count?: number;
   highlight?: string;
+  is_pinned?: number;
+  is_featured?: number;
+  content?: string;
 }
 
 export interface FollowStatus {
@@ -154,20 +157,4 @@ export interface UserPost {
 export interface UserCategory {
   category: string;
   count: number;
-}
-
-export interface Annotation {
-  id: number;
-  post_id: number;
-  user_id: number;
-  parent_id: number | null;
-  element_hash: string;
-  element_index: number;
-  element_type: string;
-  element_text: string;
-  content: string;
-  created_at: string;
-  author_username: string;
-  author_avatar: string;
-  reply_count: number;
 }
