@@ -1521,6 +1521,8 @@ input, textarea, select {
   flex-shrink: 0;
   aspect-ratio: 16 / 10;
   border-radius: var(--radius-lg);
+  position: relative;
+  overflow: hidden;
 }
 
 .posts-grid .post-card__image img {
@@ -9919,6 +9921,8 @@ a.profile-stat {
   flex-shrink: 0;
   aspect-ratio: 16 / 10;
   border-radius: var(--radius-lg);
+  position: relative;
+  overflow: hidden;
 }
 
 .post-list .post-card__image img {
