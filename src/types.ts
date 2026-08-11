@@ -155,3 +155,19 @@ export interface UserCategory {
   category: string;
   count: number;
 }
+
+export interface Annotation {
+  id: number;
+  post_id: number;
+  user_id: number;
+  parent_id: number | null;
+  element_hash: string;
+  element_index: number;
+  element_type: string;
+  element_text: string;
+  content: string;
+  created_at: string;
+  author_username: string;
+  author_avatar: string;
+  reply_count: number;
+}

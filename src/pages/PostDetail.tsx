@@ -37,7 +37,10 @@ import {
   recordPostView,
   getPostStats,
   createShareLink,
+  getAnnotations,
+  createAnnotation,
 } from '../api'
+import type { Annotation } from '../types'
 import type { PostNeighbor, RelatedPost, PostStats } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import { useReadingHistory, load as loadHistory } from '../hooks/useReadingHistory'
@@ -313,6 +316,16 @@ export default function PostDetail() {
   const [editBusy, setEditBusy] = useState(false)
   // 评论折叠：记录被折叠的评论 id
   const [collapsedComments, setCollapsedComments] = useState<Set<number>>(new Set())
+
+  // 标注系统
+  const [selectedAnnotationHash, setSelectedAnnotationHash] = useState<string | null>(null)
+  const [annotationPanelOpen, setAnnotationPanelOpen] = useState(false)
+  const [annotationText, setAnnotationText] = useState('')
+  const [annotationBusy, setAnnotationBusy] = useState(false)
+  const [annotationError, setAnnotationError] = useState('')
+  const [selectedTextInfo, setSelectedTextInfo] = useState<{ hash: string; text: string; index: number; type: string } | null>(null)
+  const [showAnnotationHint, setShowAnnotationHint] = useState(false)
+  const [selectedReplyId, setSelectedReplyId] = useState<number | null>(null)
 
   const { recordVisit, updateProgress } = useReadingHistory()
 
@@ -650,10 +663,233 @@ export default function PostDetail() {
     }
   }, [post?.author_username])
 
+  // 标注映射：element_hash → Annotation[]
+  const [annotationHashMap, setAnnotationHashMap] = useState<Record<string, Annotation[]>>({})
+
+  // 加载标注
+  const loadAnnotations = useCallback(() => {
+    if (!slug) return
+    getAnnotations(slug)
+      .then((data) => {
+        // 构建 element_hash → 标注列表的映射
+        const hashMap: Record<string, Annotation[]> = {}
+        data.forEach(a => {
+          if (!hashMap[a.element_hash]) hashMap[a.element_hash] = []
+          hashMap[a.element_hash].push(a)
+        })
+        setAnnotationHashMap(hashMap)
+      })
+      .catch(() => {})
+  }, [slug])
+
   useEffect(() => {
     loadComments()
     loadLikeStatus()
-  }, [loadComments, loadLikeStatus])
+    loadAnnotations()
+  }, [loadComments, loadLikeStatus, loadAnnotations])
+
+  // 处理文章段落，添加标注标记
+  useEffect(() => {
+    if (!post) return
+    const body = document.querySelector('.article__body')
+    if (!body) return
+
+    // 计算段落哈希
+    const paragraphs = body.querySelectorAll('h1,h2,h3,h4,h5,p,li,blockquote')
+    paragraphs.forEach((el, idx) => {
+      const text = el.textContent?.trim() || ''
+      if (!text) return
+      const elType = el.tagName.toLowerCase()
+      const hash = computeParagraphHash(post.id, text)
+      ;(el as HTMLElement).dataset.annotationHash = hash
+      ;(el as HTMLElement).dataset.annotationIndex = String(idx)
+      ;(el as HTMLElement).dataset.annotationType = elType
+    })
+
+    // 为每个段落添加标注标记按钮
+    const addAnnotationMarkers = () => {
+      body.querySelectorAll<HTMLElement>('[data-annotation-hash]').forEach(el => {
+        if (el.querySelector('.annotation-marker')) return
+        const hash = el.dataset.annotationHash || ''
+        const count = (annotationHashMap[hash] || []).length
+        if (count === 0) return
+
+        const marker = document.createElement('span')
+        marker.className = 'annotation-marker'
+        marker.dataset.hash = hash
+        marker.textContent = String(count)
+        marker.style.setProperty('--marker-count', String(count))
+        marker.onclick = (e) => {
+          e.stopPropagation()
+          handleAnnotationClick(hash)
+        }
+        el.style.position = 'relative'
+        el.style.paddingLeft = '2.5rem'
+        el.appendChild(marker)
+      })
+    }
+
+    // 初始添加标记
+    addAnnotationMarkers()
+
+    // 当标注变化时重新添加标记
+    const observer = new MutationObserver(() => addAnnotationMarkers())
+    observer.observe(body, { childList: true, subtree: true })
+
+    return () => observer.disconnect()
+  }, [post, annotationHashMap])
+
+  // Ctrl+M 快捷键创建标注
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
+        e.preventDefault()
+        handleCreateAnnotation()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [selectedTextInfo, post?.slug])
+
+  // 选中文字时显示标注提示
+  useEffect(() => {
+    function handleSelectionChange() {
+      const selection = window.getSelection()
+      if (!selection || selection.isCollapsed) {
+        setSelectedTextInfo(null)
+        setShowAnnotationHint(false)
+        return
+      }
+      const text = selection.toString().trim()
+      if (text.length < 2) {
+        setSelectedTextInfo(null)
+        setShowAnnotationHint(false)
+        return
+      }
+      const body = document.querySelector('.article__body')
+      if (!body || !body.contains(selection.anchorNode)) {
+        setSelectedTextInfo(null)
+        setShowAnnotationHint(false)
+        return
+      }
+      let container = selection.anchorNode?.parentNode
+      while (container && container !== body) {
+        if ((container as HTMLElement).dataset.annotationHash) {
+          const hash = (container as HTMLElement).dataset.annotationHash || ''
+          const idx = Number((container as HTMLElement).dataset.annotationIndex || 0)
+          const type = (container as HTMLElement).dataset.annotationType || 'p'
+          setSelectedTextInfo({ hash, text: text.slice(0, 100), index: idx, type })
+          setShowAnnotationHint(true)
+          return
+        }
+        container = container.parentNode
+      }
+      setSelectedTextInfo(null)
+      setShowAnnotationHint(false)
+    }
+    document.addEventListener('selectionchange', handleSelectionChange)
+    return () => document.removeEventListener('selectionchange', handleSelectionChange)
+  }, [post])
+
+  function computeParagraphHash(postId: number, text: string): string {
+    let hash = 0
+    const str = `${postId}:${text.slice(0, 200)}`
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0
+    }
+    return 'a' + Math.abs(hash).toString(36)
+  }
+
+  function handleAnnotationClick(hash: string) {
+    setSelectedAnnotationHash(hash)
+    setAnnotationPanelOpen(true)
+    setAnnotationText('')
+    setAnnotationError('')
+  }
+
+  async function handleCreateAnnotation() {
+    if (!selectedTextInfo || !post || !user) return
+    if (annotationBusy) return
+    if (!annotationText.trim()) {
+      setAnnotationError('请输入标注内容')
+      return
+    }
+    setAnnotationBusy(true)
+    setAnnotationError('')
+    try {
+      const result = await createAnnotation(post.slug, {
+        element_hash: selectedTextInfo.hash,
+        element_index: selectedTextInfo.index,
+        element_type: selectedTextInfo.type,
+        element_text: selectedTextInfo.text,
+        content: annotationText.trim(),
+      })
+      const hashMap = { ...annotationHashMap }
+      if (!hashMap[result.element_hash]) hashMap[result.element_hash] = []
+      hashMap[result.element_hash].push(result)
+      setAnnotationHashMap(hashMap)
+      setAnnotationPanelOpen(true)
+      setSelectedAnnotationHash(result.element_hash)
+      setAnnotationText('')
+      setShowAnnotationHint(false)
+      setSelectedTextInfo(null)
+    } catch (err) {
+      setAnnotationError(err instanceof Error ? err.message : '标注失败')
+    } finally {
+      setAnnotationBusy(false)
+    }
+  }
+
+  async function handleSubmitAnnotationReply(parentId: number) {
+    if (!post || !user) return
+    if (!annotationText.trim()) {
+      setAnnotationError('请输入回复内容')
+      return
+    }
+    setAnnotationBusy(true)
+    setAnnotationError('')
+    try {
+      const result = await createAnnotation(post.slug, {
+        element_hash: selectedAnnotationHash || '',
+        element_index: 0,
+        element_type: 'p',
+        element_text: '',
+        content: annotationText.trim(),
+        parent_id: parentId,
+      })
+      const hashMap = { ...annotationHashMap }
+      const hash = result.element_hash || (selectedAnnotationHash || '')
+      if (!hashMap[hash]) hashMap[hash] = []
+      hashMap[hash].push(result)
+      setAnnotationHashMap(hashMap)
+      setAnnotationText('')
+      setAnnotationError('')
+    } catch (err) {
+      setAnnotationError(err instanceof Error ? err.message : '回复失败')
+    } finally {
+      setAnnotationBusy(false)
+    }
+  }
+
+  function scrollToAnnotation(hash: string) {
+    const body = document.querySelector('.article__body')
+    if (!body) return
+    const el = body.querySelector(`[data-annotation-hash="${hash}"]`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }
+
+  function formatTimeAgo(dateStr: string): string {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diff = Math.floor((now.getTime() - date.getTime()) / 1000)
+    if (diff < 60) return '刚刚'
+    if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`
+    if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`
+    if (diff < 2592000) return `${Math.floor(diff / 86400)} 天前`
+    return date.toLocaleDateString('zh-CN')
+  }
 
   useEffect(() => {
     if (!mentionQuery) {
@@ -1867,6 +2103,154 @@ export default function PostDetail() {
       onClose={() => setLightboxOpen(false)}
       onIndexChange={setLightboxIndex}
     />
+    {/* 标注提示浮窗 */}
+    {showAnnotationHint && selectedTextInfo && (
+      <div className="annotation-hint" onClick={() => { setAnnotationPanelOpen(true); setSelectedAnnotationHash(selectedTextInfo.hash) }}>
+        <span className="annotation-hint__icon">💬</span>
+        <span className="annotation-hint__text">按 Ctrl+M 标注此段</span>
+      </div>
+    )}
+    {/* 标注面板 */}
+    {annotationPanelOpen && (
+      <div className="annotation-panel-overlay" onClick={() => setAnnotationPanelOpen(false)}>
+        <div className="annotation-panel" onClick={(e) => e.stopPropagation()}>
+          <div className="annotation-panel__header">
+            <span className="annotation-panel__title">段落标注</span>
+            <button
+              type="button"
+              className="annotation-panel__close"
+              onClick={() => setAnnotationPanelOpen(false)}
+              aria-label="关闭标注"
+            >
+              ✕
+            </button>
+          </div>
+          {selectedAnnotationHash && (
+            <div className="annotation-panel__source">
+              {(() => {
+                const ans = annotationHashMap[selectedAnnotationHash] || []
+                const first = ans[0]
+                return first ? (
+                  <p className="annotation-panel__source-text">{first.element_text || '选中的文字'}</p>
+                ) : null
+              })()}
+              <button
+                type="button"
+                className="annotation-panel__scroll-btn"
+                onClick={() => {
+                  if (selectedAnnotationHash) scrollToAnnotation(selectedAnnotationHash)
+                  setAnnotationPanelOpen(false)
+                }}
+              >
+                定位到原文
+              </button>
+            </div>
+          )}
+          <div className="annotation-panel__list">
+            {(() => {
+              const ans = selectedAnnotationHash ? (annotationHashMap[selectedAnnotationHash] || []) : []
+              if (ans.length === 0) {
+                return <div className="annotation-panel__empty">暂无标注，成为第一个评论的人</div>
+              }
+              return ans.map(a => (
+                <div key={a.id} className="annotation-item">
+                  <div className="annotation-item__header">
+                    <img
+                      className="annotation-item__avatar"
+                      src={a.author_avatar || '/default-avatar.png'}
+                      alt={a.author_username}
+                      loading="lazy"
+                    />
+                    <span className="annotation-item__author">{a.author_username}</span>
+                    <span className="annotation-item__time">{formatTimeAgo(a.created_at)}</span>
+                  </div>
+                  <div className="annotation-item__content">{a.content}</div>
+                  {user && (
+                    <div className="annotation-item__actions">
+                      <button
+                        type="button"
+                        className="annotation-item__reply-btn"
+                        onClick={() => {
+                          setSelectedReplyId(a.id)
+                          setAnnotationText('')
+                          setAnnotationError('')
+                        }}
+                      >
+                        回复
+                      </button>
+                    </div>
+                  )}
+                  {(() => {
+                    const replies = ans.filter(r => r.parent_id === a.id)
+                    if (replies.length === 0) return null
+                    return replies.map(r => (
+                      <div key={r.id} className="annotation-item annotation-item--reply">
+                        <div className="annotation-item__header">
+                          <img className="annotation-item__avatar" src={r.author_avatar || '/default-avatar.png'} alt={r.author_username} loading="lazy" />
+                          <span className="annotation-item__author">{r.author_username}</span>
+                          <span className="annotation-item__time">{formatTimeAgo(r.created_at)}</span>
+                        </div>
+                        <div className="annotation-item__content">{r.content}</div>
+                      </div>
+                    ))
+                  })()}
+                </div>
+              ))
+            })()}
+          </div>
+          {user && (
+            <div className="annotation-panel__form">
+              {(() => {
+                const ans = selectedAnnotationHash ? (annotationHashMap[selectedAnnotationHash] || []) : []
+                return selectedReplyId !== null ? (
+                  <div className="annotation-panel__reply-header">
+                    <span>回复 @{ans.find(a => a.id === selectedReplyId)?.author_username}</span>
+                    <button type="button" className="annotation-panel__cancel-reply" onClick={() => setSelectedReplyId(null)}>✕</button>
+                  </div>
+                ) : null
+              })()}
+              <textarea
+                className="annotation-panel__textarea"
+                placeholder={selectedReplyId !== null ? '输入回复内容...' : '标注这段文字...'}
+                value={annotationText}
+                onChange={(e) => setAnnotationText(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    e.preventDefault()
+                    if (selectedReplyId !== null) {
+                      handleSubmitAnnotationReply(selectedReplyId)
+                    } else {
+                      handleCreateAnnotation()
+                    }
+                  }
+                }}
+                rows={3}
+              />
+              {annotationError && <div className="form__error annotation-panel__error">{annotationError}</div>}
+              <button
+                type="button"
+                className="btn-primary annotation-panel__submit"
+                onClick={() => {
+                  if (selectedReplyId !== null) {
+                    handleSubmitAnnotationReply(selectedReplyId)
+                  } else {
+                    handleCreateAnnotation()
+                  }
+                }}
+                disabled={annotationBusy}
+              >
+                {annotationBusy ? '提交中...' : (selectedReplyId !== null ? '回复' : '标注')}
+              </button>
+            </div>
+          )}
+          {!user && (
+            <div className="annotation-panel__login-hint">
+              <Link to="/login" className="annotation-panel__login-link">登录</Link> 后可标注
+            </div>
+          )}
+        </div>
+      </div>
+    )}
     </>
   )
 }
