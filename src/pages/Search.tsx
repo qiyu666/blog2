@@ -57,7 +57,7 @@ export default function Search() {
       {results.length > 0 && (
         <>
           <p className="search-page__count">共 {results.length} 条结果</p>
-          <div className="posts-grid">
+          <div className="post-list">
             {results.map((post) => (
               <PostCard key={post.id} post={post} />
             ))}
