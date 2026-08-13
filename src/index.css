@@ -12856,6 +12856,7 @@ a.profile-stat {
 .social-link--bilibili:hover { color: #FB7299; border-color: #FB7299; }
 .social-link--email:hover { color: var(--accent); border-color: var(--accent); }
 .social-link--facebook:hover { color: #1877F2; border-color: #1877F2; }
+.social-link--whatsapp:hover { color: #25D366; border-color: #25D366; }
 
 .social-link svg {
   width: 18px;
