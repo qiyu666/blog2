@@ -677,6 +677,7 @@ interface SocialLinksProps {
     social_bilibili?: string
     social_email?: string
     social_facebook?: string
+    social_whatsapp?: string
   }
   isOwn?: boolean
 }
@@ -690,7 +691,8 @@ function SocialLinks({ user, isOwn }: SocialLinksProps) {
       user.social_telegram?.trim() ||
       user.social_bilibili?.trim() ||
       user.social_email?.trim() ||
-      user.social_facebook?.trim())
+      user.social_facebook?.trim() ||
+      user.social_whatsapp?.trim())
 
   // 他人主页且无链接：不显示
   if (!hasAny && !isOwn) return null
