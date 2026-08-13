@@ -4567,17 +4567,12 @@ input, textarea, select {
     grid-template-columns: 1fr;
   }
 
-  .posts-grid .post-card {
-    flex-direction: column;
-  }
-
   .posts-grid .post-card__image {
-    width: 100%;
-    aspect-ratio: 16 / 9;
+    width: 120px;
   }
 
   .posts-grid .post-card__body {
-    padding: var(--space-3);
+    padding: var(--space-2);
   }
 
   .post-card__image {
@@ -10325,13 +10320,8 @@ a.profile-stat {
     display: none;
   }
 
-  .post-list .post-card {
-    flex-direction: column;
-  }
-
   .post-list .post-card__image {
-    width: 100%;
-    aspect-ratio: 16 / 9;
+    width: 140px;
   }
 
   .section-head {
@@ -13476,17 +13466,12 @@ a.profile-stat {
   }
 
   /* Post cards */
-  .post-list .post-card {
-    flex-direction: column;
-  }
-
   .post-list .post-card__image {
-    width: 100%;
-    aspect-ratio: 16 / 9;
+    width: 140px;
   }
 
   .post-list .post-card__body {
-    padding: var(--space-3);
+    padding: var(--space-2);
   }
 
   .post-card__title {
