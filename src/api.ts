@@ -583,6 +583,7 @@ export interface ProfileUpdate {
   social_bilibili?: string;
   social_email?: string;
   social_facebook?: string;
+  social_whatsapp?: string;
 }
 
 export async function getUserProfile(username: string): Promise<UserProfile> {

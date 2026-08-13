@@ -57,6 +57,7 @@ export interface User {
   social_bilibili?: string;
   social_email?: string;
   social_facebook?: string;
+  social_whatsapp?: string;
   password_hash?: string;
   created_at: string;
 }
