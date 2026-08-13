@@ -44,7 +44,7 @@ export default function SocialLinks({ user, size = 'md' }: SocialLinksProps) {
     links.push({
       key: 'qq',
       cls: 'social-link--qq',
-      href: `tencent://message/?uin=${user.social_qq.trim()}`,
+      href: `https://wpa.qq.com/msgrd?v=3&uin=${user.social_qq.trim()}&site=qq&menu=yes`,
       title: `QQ: ${user.social_qq.trim()}`,
       icon: <QqIcon />,
     })
