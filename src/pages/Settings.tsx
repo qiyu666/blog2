@@ -21,6 +21,7 @@ export default function Settings() {
   const [socialTelegram, setSocialTelegram] = useState('')
   const [socialBilibili, setSocialBilibili] = useState('')
   const [socialEmail, setSocialEmail] = useState('')
+  const [socialFacebook, setSocialFacebook] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -90,6 +91,7 @@ export default function Settings() {
         setSocialTelegram(u.social_telegram || '')
         setSocialBilibili(u.social_bilibili || '')
         setSocialEmail(u.social_email || '')
+        setSocialFacebook(u.social_facebook || '')
       })
       .catch(() => {
         // ignore — 社交字段保持空
@@ -287,6 +289,7 @@ export default function Settings() {
       social_telegram: socialTelegram,
       social_bilibili: socialBilibili,
       social_email: socialEmail,
+      social_facebook: socialFacebook,
     }
 
     try {
@@ -793,6 +796,19 @@ export default function Settings() {
                 maxLength={200}
               />
             </div>
+            <div className="settings-social__field">
+              <label className="settings-social__label">
+                <FacebookIcon /> Facebook 用户名
+              </label>
+              <input
+                className="form__input"
+                type="text"
+                value={socialFacebook}
+                onChange={(e) => setSocialFacebook(e.target.value)}
+                placeholder="username"
+                maxLength={200}
+              />
+            </div>
           </div>
         </div>
 
@@ -1129,6 +1145,14 @@ function EmailIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
+    </svg>
+  )
+}
+
+function FacebookIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
     </svg>
   )
 }

@@ -53,6 +53,7 @@ export interface User {
   social_telegram?: string;
   social_bilibili?: string;
   social_email?: string;
+  social_facebook?: string;
   password_hash?: string;
   created_at: string;
 }
