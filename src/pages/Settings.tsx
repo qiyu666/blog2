@@ -798,14 +798,14 @@ export default function Settings() {
             </div>
             <div className="settings-social__field">
               <label className="settings-social__label">
-                <FacebookIcon /> Facebook 用户名
+                <FacebookIcon /> Facebook ID
               </label>
               <input
                 className="form__input"
                 type="text"
                 value={socialFacebook}
                 onChange={(e) => setSocialFacebook(e.target.value)}
-                placeholder="username"
+                placeholder="100000000000000"
                 maxLength={200}
               />
             </div>

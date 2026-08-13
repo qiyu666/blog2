@@ -87,8 +87,8 @@ export default function SocialLinks({ user, size = 'md' }: SocialLinksProps) {
     links.push({
       key: 'facebook',
       cls: 'social-link--facebook',
-      href: `https://facebook.com/${user.social_facebook.trim()}`,
-      title: `Facebook: ${user.social_facebook.trim()}`,
+      href: `https://facebook.com/profile.php?id=${user.social_facebook.trim()}`,
+      title: `Facebook ID: ${user.social_facebook.trim()}`,
       icon: <FacebookIcon />,
     })
   }
