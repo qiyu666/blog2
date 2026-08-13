@@ -1511,13 +1511,13 @@ input, textarea, select {
 
 .posts-grid .post-card {
   display: flex;
-  flex-direction: row;
+  flex-direction: row !important;
   gap: var(--space-lg);
   padding: var(--space-lg);
 }
 
 .posts-grid .post-card__image {
-  width: 180px;
+  width: 280px;
   flex-shrink: 0;
   aspect-ratio: 16 / 10;
   border-radius: var(--radius-lg);
@@ -4568,7 +4568,7 @@ input, textarea, select {
   }
 
   .posts-grid .post-card__image {
-    width: 120px;
+    width: 140px;
   }
 
   .posts-grid .post-card__body {
@@ -10324,6 +10324,10 @@ a.profile-stat {
     width: 140px;
   }
 
+  .posts-grid .post-card__image {
+    width: 140px;
+  }
+
   .section-head {
     flex-direction: column;
     align-items: flex-start;
@@ -13471,6 +13475,14 @@ a.profile-stat {
   }
 
   .post-list .post-card__body {
+    padding: var(--space-2);
+  }
+
+  .posts-grid .post-card__image {
+    width: 140px;
+  }
+
+  .posts-grid .post-card__body {
     padding: var(--space-2);
   }
 
