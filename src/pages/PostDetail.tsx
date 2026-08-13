@@ -1577,7 +1577,12 @@ export default function PostDetail() {
         <header className="article__header">
           <span className="article__category">{post.category}</span>
           <h1 className="article__title">{post.title}</h1>
-          {post.excerpt && <p className="article__excerpt">{post.excerpt}</p>}
+          {post.excerpt && !post.has_password && (
+            <p className="article__excerpt">{post.excerpt}</p>
+          )}
+          {post.excerpt && post.has_password && passwordUnlocked && (
+            <p className="article__excerpt">{post.excerpt}</p>
+          )}
           <div className="article__meta">
             <span className="article__author">
               {authorAvatar && (
