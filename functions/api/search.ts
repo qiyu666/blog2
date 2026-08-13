@@ -25,6 +25,7 @@ export async function onRequestGet(context: {
       .prepare(
         `SELECT p.id, p.title, p.slug, p.excerpt, p.category, p.cover_image,
           p.views, p.created_at, p.author_id, p.is_pinned, p.is_featured, p.content,
+          CASE WHEN p.password IS NOT NULL AND p.password != '' THEN 1 ELSE 0 END AS has_password,
           u.username AS author_username,
           (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS likes_count,
           (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comments_count,

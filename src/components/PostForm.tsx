@@ -256,6 +256,7 @@ export default function PostForm({
     cover_image: initial?.cover_image ?? '',
     published: initial?.published ?? 1,
     custom_js: initial?.custom_js ?? '',
+    password: initial?.password ?? '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -687,6 +688,23 @@ export default function PostForm({
 
         {showSettings && (
           <div className="editor-form__advanced-body">
+            {/* 密码保护 */}
+            <div className="editor-form__advanced-row">
+              <div className="editor-form__advanced-header">
+                <label className="editor-form__advanced-label">访问密码</label>
+                <span className="editor-form__advanced-hint">
+                  设置后，读者需输入密码才能查看正文内容
+                </span>
+              </div>
+              <input
+                className="editor-form__input"
+                type="text"
+                value={form.password || ''}
+                onChange={(e) => update('password', e.target.value)}
+                placeholder="留空表示不设密码"
+              />
+            </div>
+
             {/* Publish status (edit mode only) */}
             {!isNewMode && (
               <div className="editor-form__advanced-row">

@@ -20,6 +20,7 @@ interface PostInput {
   is_pinned?: number
   is_featured?: number
   custom_js?: string
+  password?: string
 }
 
 export async function onRequestGet(context: {
@@ -68,6 +69,7 @@ export async function onRequestGet(context: {
         p.id, p.title, p.slug, p.excerpt, p.content, p.author, p.category,
         p.tags, p.cover_image, p.published, p.views, p.created_at, p.updated_at,
         p.author_id, p.is_pinned, p.is_featured,
+        CASE WHEN p.password IS NOT NULL AND p.password != '' THEN 1 ELSE 0 END AS has_password,
         u.username AS author_username,
         (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS likes_count,
         (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comments_count
@@ -115,8 +117,8 @@ export async function onRequestPost(context: {
   const category = cleanText(body.category, 50).trim() || 'General'
   const tags = cleanText(body.tags, 200).trim()
   const cover_image = cleanText(body.cover_image, 500).trim()
-  // 限制自定义 JS 长度为 20KB
   const custom_js = cleanText(body.custom_js || '', 20000)
+  const password = (body.password || '').trim()
 
   if (!title || !content) {
     return error('标题和内容不能为空')
@@ -134,8 +136,8 @@ export async function onRequestPost(context: {
 
   try {
     const result = await env.DB.prepare(
-      `INSERT INTO posts (title, slug, excerpt, content, author, author_id, category, tags, cover_image, published, is_pinned, is_featured, custom_js)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO posts (title, slug, excerpt, content, author, author_id, category, tags, cover_image, published, is_pinned, is_featured, custom_js, password)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         title,
@@ -150,7 +152,8 @@ export async function onRequestPost(context: {
         published,
         is_pinned,
         is_featured,
-        custom_js
+        custom_js,
+        password
       )
       .run()
 

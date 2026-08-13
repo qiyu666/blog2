@@ -3,7 +3,7 @@
 import { json, error } from '../_helpers'
 import { getSession } from '../_auth'
 
-const LATEST = 15
+const LATEST = 17
 
 export async function onRequestGet(context: {
   request: Request

@@ -22,7 +22,7 @@ export async function onRequestGet(context: {
           `SELECT id, username, display_name, role, avatar, bio, location, website,
             profile_css, profile_bg, profile_layout, created_at,
             social_github, social_twitter, social_qq, social_wechat,
-            social_telegram, social_bilibili, social_email, social_facebook
+            social_telegram, social_bilibili, social_email, social_facebook, social_whatsapp
            FROM users WHERE username = ?`
         )
         .bind(username)
@@ -59,6 +59,7 @@ export async function onRequestGet(context: {
         user.social_bilibili = ''
         user.social_email = ''
         user.social_facebook = ''
+        user.social_whatsapp = ''
       }
     }
     if (!user) return error('用户不存在', 404)
@@ -180,6 +181,7 @@ export async function onRequestPatch(context: {
     social_bilibili?: string
     social_email?: string
     social_facebook?: string
+    social_whatsapp?: string
   }
   try {
     body = await request.json()
@@ -243,6 +245,7 @@ export async function onRequestPatch(context: {
       ['social_bilibili', body.social_bilibili],
       ['social_email', body.social_email],
       ['social_facebook', body.social_facebook],
+      ['social_whatsapp', body.social_whatsapp],
     ]
     const socialProvided = socialFields.filter(([, v]) => v !== undefined)
     let socialSkipped = false
@@ -275,7 +278,7 @@ export async function onRequestPatch(context: {
           `SELECT id, username, display_name, email, role, avatar, bio,
             location, website, profile_css, profile_bg, profile_layout, created_at,
             social_github, social_twitter, social_qq, social_wechat,
-            social_telegram, social_bilibili, social_email, social_facebook
+            social_telegram, social_bilibili, social_email, social_facebook, social_whatsapp
            FROM users WHERE id = ?`
         )
         .bind(user.id)
