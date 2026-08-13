@@ -18,6 +18,8 @@ export interface Post {
   is_pinned?: number;
   is_featured?: number;
   custom_js?: string;
+  has_password?: boolean;
+  password?: string;
   created_at: string;
   updated_at: string;
 }
@@ -31,6 +33,7 @@ export interface PostInput {
   cover_image: string;
   published?: number;
   custom_js?: string;
+  password?: string;
 }
 
 export interface User {
@@ -113,6 +116,7 @@ export interface SearchResult {
   is_pinned?: number;
   is_featured?: number;
   content?: string;
+  has_password?: boolean;
 }
 
 export interface FollowStatus {

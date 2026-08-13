@@ -17,6 +17,7 @@ interface PostInput {
   is_pinned?: number
   is_featured?: number
   custom_js?: string
+  password?: string
 }
 
 function isNumeric(s: string): boolean {
@@ -115,7 +116,10 @@ async function getPostWithStats(db: D1Database, idParam: string) {
       )
       .bind(Number(idParam))
       .first()
-    if (post) return post
+    if (post) {
+      post.has_password = !!(post.password && post.password !== '')
+      return post
+    }
   }
 
   post = await db
@@ -129,6 +133,9 @@ async function getPostWithStats(db: D1Database, idParam: string) {
     .bind(idParam)
     .first()
 
+  if (post) {
+    post.has_password = !!(post.password && post.password !== '')
+  }
   return post
 }
 
@@ -154,6 +161,51 @@ export async function onRequestGet(context: {
       const isAdmin = !!user && user.role === 'admin'
       if (!isAuthor && !isAdmin) {
         return error('Post not found', 404)
+      }
+    }
+
+    // Password protection: check if post has a password
+    if (post.password && post.password !== '') {
+      const url = new URL(request.url)
+      const providedPassword = url.searchParams.get('password') || ''
+      // Also check Authorization header for password verification
+      const authHeader = request.headers.get('Authorization') || ''
+      const headerPassword = authHeader.startsWith('Bearer ') ? decodeURIComponent(authHeader.slice(7)) : ''
+      const effectivePassword = providedPassword || headerPassword
+
+      // Check session-based unlock
+      const cookies = request.headers.get('Cookie') || ''
+      let sessionUnlocked = false
+      if (cookies.includes(`post_unlock_${post.id}=1`)) {
+        sessionUnlocked = true
+      }
+
+      if (!sessionUnlocked && effectivePassword !== post.password) {
+        // Return post metadata without content
+        return json({
+          id: post.id,
+          title: post.title,
+          slug: post.slug,
+          excerpt: post.excerpt,
+          cover_image: post.cover_image,
+          category: post.category,
+          tags: post.tags,
+          author: post.author,
+          author_id: post.author_id,
+          author_username: post.author_username,
+          author_avatar: post.author_avatar,
+          published: post.published,
+          views: post.views,
+          likes_count: post.likes_count,
+          comments_count: post.comments_count,
+          is_pinned: post.is_pinned,
+          is_featured: post.is_featured,
+          created_at: post.created_at,
+          updated_at: post.updated_at,
+          has_password: true,
+          content: '',
+          custom_js: '',
+        })
       }
     }
 
@@ -226,6 +278,7 @@ export async function onRequestPut(context: {
   const tags = cleanText(body.tags, 200).trim()
   const cover_image = cleanText(body.cover_image, 500).trim()
   const custom_js = cleanText(body.custom_js || '', 20000)
+  const password = (body.password ?? '').trim()
 
   if (!title || !content) {
     return error('标题和内容不能为空')
@@ -276,11 +329,11 @@ export async function onRequestPut(context: {
         title = ?, slug = ?, excerpt = ?, content = ?,
         category = ?, tags = ?, cover_image = ?,
         published = ?, is_pinned = ?, is_featured = ?,
-        custom_js = ?,
+        custom_js = ?, password = ?,
         updated_at = datetime('now')
        WHERE id = ?`
     )
-      .bind(title, newSlug, excerpt, content, category, tags, cover_image, published, is_pinned, is_featured, custom_js, postId)
+      .bind(title, newSlug, excerpt, content, category, tags, cover_image, published, is_pinned, is_featured, custom_js, password, postId)
       .run()
 
     const updated = await getPostWithStats(env.DB, String(postId))

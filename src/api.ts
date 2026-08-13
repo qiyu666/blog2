@@ -1082,3 +1082,26 @@ export async function getPostStats(slug: string): Promise<PostStats | null> {
     return null;
   }
 }
+
+// ===== 在线人数 =====
+export async function getPostOnlineCount(postId: number): Promise<number> {
+  try {
+    const data = await request<{ online: number }>(`/api/posts/${postId}/online`);
+    return data.online;
+  } catch {
+    return 0;
+  }
+}
+
+export async function postHeartbeat(postId: number, sessionId: string): Promise<void> {
+  try {
+    await fetch(`/api/posts/${postId}/online`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+  } catch {
+    // 静默失败
+  }
+}

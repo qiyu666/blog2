@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, FormEvent } from 'react'
+import { useEffect, useState, useCallback, FormEvent, useRef } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import Prism from 'prismjs'
 import 'prismjs/components/prism-javascript'
@@ -37,6 +37,8 @@ import {
   recordPostView,
   getPostStats,
   createShareLink,
+  getPostOnlineCount,
+  postHeartbeat,
 } from '../api'
 import type { PostNeighbor, RelatedPost, PostStats } from '../api'
 import { useAuth } from '../auth/AuthContext'
@@ -399,13 +401,30 @@ export default function PostDetail() {
   const [shareError, setShareError] = useState('')
   const [shareCopied, setShareCopied] = useState(false)
 
+  // 密码保护
+  const [passwordUnlocked, setPasswordUnlocked] = useState(false)
+  const [passwordInput, setPasswordInput] = useState('')
+  const [passwordError, setPasswordError] = useState('')
+  const [verifyingPassword, setVerifyingPassword] = useState(false)
+
+  // 在线人数
+  const [onlineCount, setOnlineCount] = useState(0)
+  const sessionIdRef = useRef<string>('')
+
   const loadPost = useCallback(() => {
     if (!slug) return
     setLoading(true)
     getPost(slug)
       .then((data) => {
+        // 检查是否已通过会话解锁
+        const unlocked = !!data.has_password && document.cookie.includes(`post_unlock_${data.id}=1`)
+        setPasswordUnlocked(!data.has_password || unlocked)
         setPost(data)
-        setToc(extractToc(data.content))
+        if (data.has_password && !unlocked) {
+          setToc([])
+        } else {
+          setToc(extractToc(data.content))
+        }
         setLoading(false)
 
         // 检查本地历史中是否有未完成的阅读进度
@@ -423,6 +442,11 @@ export default function PostDetail() {
           cover_image: data.cover_image,
           author_username: data.author_username ?? undefined,
         })
+
+        // 生成本会话 ID 并上报心跳
+        if (!sessionIdRef.current) {
+          sessionIdRef.current = `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+        }
       })
       .catch((err) => {
         setError(err.message)
@@ -804,6 +828,104 @@ export default function PostDetail() {
       handlers.forEach((off) => off())
     }
   }, [post])
+
+  async function handlePasswordUnlock() {
+    if (!post || !passwordInput.trim()) return
+    setVerifyingPassword(true)
+    setPasswordError('')
+    try {
+      // 通过带密码参数重新加载文章
+      const data = await getPost(`${slug}?password=${encodeURIComponent(passwordInput)}`)
+      if (data.content) {
+        // 设置 cookie 以便会话内免再次输入
+        document.cookie = `post_unlock_${post.id}=1; path=/; max-age=1800`
+        setPasswordUnlocked(true)
+        setPost(data)
+        setToc(extractToc(data.content))
+        setPasswordInput('')
+      } else {
+        setPasswordError('密码错误，请重试')
+      }
+    } catch {
+      setPasswordError('密码错误，请重试')
+    } finally {
+      setVerifyingPassword(false)
+    }
+  }
+
+  // 在线人数：加载后开始心跳和轮询
+  useEffect(() => {
+    if (!post?.id) return
+    const sessionId = sessionIdRef.current
+    if (!sessionId) return
+
+    // 立即上报一次
+    postHeartbeat(post.id, sessionId)
+    getPostOnlineCount(post.id).then(setOnlineCount)
+
+    // 心跳：每 30 秒
+    const heartbeatTimer = setInterval(() => {
+      postHeartbeat(post.id, sessionId)
+    }, 30000)
+
+    // 轮询在线人数：每 15 秒
+    const countTimer = setInterval(() => {
+      getPostOnlineCount(post.id).then(setOnlineCount)
+    }, 15000)
+
+    // 页面可见性变化时更新
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        postHeartbeat(post.id, sessionId)
+        getPostOnlineCount(post.id).then(setOnlineCount)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    // 页面卸载时清理
+    const handleBeforeUnload = () => {
+      // 简单方式：通过发送一个不带 session 的请求来减少计数
+      // 实际上依赖后端超时机制（60秒）自动清理
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      clearInterval(heartbeatTimer)
+      clearInterval(countTimer)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [post?.id])
+
+  // 文章页快捷键
+  useEffect(() => {
+    if (!post) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+      if (isInput) return
+
+      // 仅在文章页生效
+      if (!post.has_password || passwordUnlocked) {
+        if (e.key === 'ArrowLeft' && neighbors.previous) {
+          e.preventDefault()
+          navigate(`/post/${neighbors.previous.slug}`)
+        } else if (e.key === 'ArrowRight' && neighbors.next) {
+          e.preventDefault()
+          navigate(`/post/${neighbors.next.slug}`)
+        } else if (e.key.toLowerCase() === 'f') {
+          handleToggleFavorite()
+        } else if (e.key.toLowerCase() === 'l') {
+          handleToggleLike()
+        } else if (e.key.toLowerCase() === 'c') {
+          const commentsEl = document.getElementById('comments')
+          if (commentsEl) commentsEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [post, neighbors, passwordUnlocked, navigate])
 
   async function handleDelete() {
     if (!post) return
@@ -1477,6 +1599,15 @@ export default function PostDetail() {
             <span title={canEdit && postStats ? `PV ${postStats.pv} · UV ${postStats.uv}` : ''}>
               {post.views} 次浏览
             </span>
+            {passwordUnlocked && (
+              <>
+                <span className="article__meta-divider">·</span>
+                <span className="article__online" title="实时在线人数">
+                  <span className="article__online-dot" />
+                  {onlineCount} 人在线
+                </span>
+              </>
+            )}
             {canEdit && postStats && (
               <>
                 <span className="article__meta-divider">·</span>
@@ -1503,14 +1634,53 @@ export default function PostDetail() {
           </div>
         </div>
 
-        <div
-          className="article__body"
-          style={{
-            fontSize: `${fontScale}%`,
-            fontFamily: fontFamilyCSS[fontFamily],
-          }}
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(post.content) }}
-        />
+        {(post.has_password && !passwordUnlocked) ? (
+          <div className="article__password-lock">
+            <div className="article__password-icon">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+            </div>
+            <h3 className="article__password-title">此文已加密</h3>
+            <p className="article__password-desc">作者为这篇文章设置了访问密码，请输入密码后查看。</p>
+            <div className="article__password-form">
+              <input
+                type="password"
+                className="article__password-input"
+                value={passwordInput}
+                onChange={(e) => { setPasswordInput(e.target.value); setPasswordError('') }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handlePasswordUnlock() }}
+                placeholder="请输入访问密码"
+                autoFocus
+              />
+              {passwordError && <div className="article__password-error">{passwordError}</div>}
+              <button
+                type="button"
+                className="article__password-submit"
+                onClick={handlePasswordUnlock}
+                disabled={verifyingPassword || !passwordInput.trim()}
+              >
+                {verifyingPassword ? '验证中…' : '解锁阅读'}
+              </button>
+            </div>
+            {post.excerpt && (
+              <div className="article__password-excerpt">
+                <p className="article__password-excerpt-label">摘要（预览）</p>
+                <p>{post.excerpt}</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div
+            className="article__body"
+            style={{
+              fontSize: `${fontScale}%`,
+              fontFamily: fontFamilyCSS[fontFamily],
+            }}
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(post.content) }}
+          />
+        )}
 
         <footer className="article__footer">
           {tags.length > 0 && (
