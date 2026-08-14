@@ -310,27 +310,14 @@ export default function UserProfile() {
           </div>
         ) : null
       case 'social':
-        return (user.website || user.location) ? (
+        return (
           <div className="container profile-social-section" key="social">
             <div className="section-header">
               <h2 className="section-header__title">社交链接</h2>
             </div>
-            <div className="profile-social-section__links">
-              {user.website && (
-                <a href={user.website} target="_blank" rel="noopener noreferrer" className="profile-social-section__link">
-                  <span className="profile-social-section__icon">🔗</span>
-                  {user.website.replace(/^https?:\/\//, '')}
-                </a>
-              )}
-              {user.location && (
-                <span className="profile-social-section__link">
-                  <span className="profile-social-section__icon">📍</span>
-                  {user.location}
-                </span>
-              )}
-            </div>
+            <SocialLinks user={user} isOwn={isOwnProfile} />
           </div>
-        ) : null
+        )
       default:
         return null
     }
