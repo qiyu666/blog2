@@ -8,9 +8,9 @@
     "deploy": "npm run build && npx wrangler pages deploy ./dist",
     "db:create": "npx wrangler d1 create blog-db",
     "db:init": "npx wrangler d1 execute blog-db --file=./schema.sql",
-    "db:init:remote": "npx wrangler d1 execute blog-db --remote --file=./schema-v2.sql",
-    "db:migrate": "npx wrangler d1 execute blog-db --file=./schema-v2.sql",
-    "db:migrate:remote": "npx wrangler d1 execute blog-db --remote --file=./schema-v2.sql"
+    "db:init:remote": "npx wrangler d1 execute blog-db --remote --file=./schema-v17.sql",
+    "db:migrate": "npx wrangler d1 execute blog-db --file=./schema-v17.sql",
+    "db:migrate:remote": "npx wrangler d1 execute blog-db --remote --file=./schema-v17.sql"
   },
   "dependencies": {
     "@types/dompurify": "^3.0.5",

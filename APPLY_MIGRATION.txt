@@ -1,9 +1,0 @@
-重要：社交联系方式功能需要先执行数据库迁移！
-
-本地D1:
-  npx wrangler d1 execute blog-db --local --file=./schema-v9.sql
-
-远程D1（生产环境）:
-  npx wrangler d1 execute blog-db --remote --file=./schema-v9.sql
-
-执行后刷新页面即可看到社交图标。
