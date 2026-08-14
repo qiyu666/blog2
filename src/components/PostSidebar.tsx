@@ -19,6 +19,8 @@ export default function PostSidebar({ post }: PostSidebarProps) {
     social_telegram?: string;
     social_bilibili?: string;
     social_email?: string;
+    social_facebook?: string;
+    social_whatsapp?: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -42,6 +44,8 @@ export default function PostSidebar({ post }: PostSidebarProps) {
             social_telegram: profile.user.social_telegram,
             social_bilibili: profile.user.social_bilibili,
             social_email: profile.user.social_email,
+            social_facebook: profile.user.social_facebook,
+            social_whatsapp: profile.user.social_whatsapp,
           });
         })
         .catch(() => ''),
