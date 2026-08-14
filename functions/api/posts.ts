@@ -119,13 +119,21 @@ export async function onRequestPost(context: {
   const cover_image = cleanText(body.cover_image, 500).trim()
   const custom_js = cleanText(body.custom_js || '', 20000)
   const password = (body.password || '').trim()
+  const scheduled_at = body.scheduled_at ? cleanText(String(body.scheduled_at), 50) || null : null
 
   if (!title || !content) {
     return error('标题和内容不能为空')
   }
 
   // Draft support: published defaults to 1 (published), 0 creates a draft.
-  const published = body.published === 0 ? 0 : 1
+  // If scheduled_at is set, publish immediately but mark as scheduled
+  let published = body.published === 0 ? 0 : 1
+  if (scheduled_at && published === 1) {
+    const scheduledTime = new Date(scheduled_at).getTime()
+    if (scheduledTime > Date.now()) {
+      published = 0 // 定时发布：先存为草稿，由 cron 触发时发布
+    }
+  }
 
   // is_pinned / is_featured are admin-only; non-admins always get 0.
   const isAdmin = user.role === 'admin'
@@ -136,8 +144,8 @@ export async function onRequestPost(context: {
 
   try {
     const result = await env.DB.prepare(
-      `INSERT INTO posts (title, slug, excerpt, content, author, author_id, category, tags, cover_image, published, is_pinned, is_featured, custom_js, password)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO posts (title, slug, excerpt, content, author, author_id, category, tags, cover_image, published, is_pinned, is_featured, custom_js, password, scheduled_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         title,
@@ -153,7 +161,8 @@ export async function onRequestPost(context: {
         is_pinned,
         is_featured,
         custom_js,
-        password
+        password,
+        scheduled_at
       )
       .run()
 

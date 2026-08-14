@@ -20,6 +20,7 @@ export interface Post {
   custom_js?: string;
   has_password?: boolean;
   password?: string;
+  scheduled_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -34,6 +35,7 @@ export interface PostInput {
   published?: number;
   custom_js?: string;
   password?: string;
+  scheduled_at?: string | null;
 }
 
 export interface User {

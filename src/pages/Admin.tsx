@@ -50,6 +50,7 @@ type Tab =
   | 'tags'
   | 'pages'
   | 'comments'
+  | 'calendar'
   | 'reports'
   | 'bugs'
   | 'data'
@@ -559,6 +560,7 @@ export default function Admin() {
     tags: ['内容管理', '标签管理'],
     pages: ['内容管理', '独立页面'],
     comments: ['内容管理', '评论管理'],
+    calendar: ['内容管理', '内容日历'],
     reports: ['社区管理', '举报审核'],
     bugs: ['社区管理', 'Bug反馈'],
     data: ['系统设置', '数据管理'],
@@ -573,6 +575,7 @@ export default function Admin() {
     tags: { title: '标签管理', desc: '管理文章标签' },
     pages: { title: '独立页面', desc: '管理关于页、友链页等独立页面' },
     comments: { title: '评论管理', desc: '审核和管理用户评论' },
+    calendar: { title: '内容日历', desc: '查看每月文章发布情况' },
     reports: { title: '举报审核', desc: '处理用户举报内容' },
     bugs: { title: 'Bug反馈', desc: '处理用户提交的Bug和建议' },
     data: { title: '数据管理', desc: '导出/导入文章数据' },
@@ -816,6 +819,11 @@ export default function Admin() {
           {/* 站点设置 */}
           {activeTab === 'settings' && (
             <SettingsView />
+          )}
+
+          {/* 内容日历 */}
+          {activeTab === 'calendar' && (
+            <CalendarView posts={posts} />
           )}
         </div>
       </main>
@@ -2417,6 +2425,78 @@ function SettingsView() {
         <button type="button" className="admin-btn admin-btn--ghost">
           重置为默认
         </button>
+      </div>
+    </div>
+  )
+}
+
+// ===== 内容日历 =====
+function CalendarView({ posts }: { posts: AdminPost[] }) {
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const year = currentDate.getFullYear()
+  const month = currentDate.getMonth()
+
+  const postDates = useMemo(() => {
+    const map = new Map<string, number>()
+    posts.forEach((p) => {
+      const d = new Date(p.created_at + 'Z')
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      map.set(key, (map.get(key) || 0) + 1)
+    })
+    return map
+  }, [posts])
+
+  const firstDay = new Date(year, month, 1)
+  const lastDay = new Date(year, month + 1, 0)
+  const startOffset = (firstDay.getDay() + 6) % 7
+  const daysInMonth = lastDay.getDate()
+  const today = new Date()
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+  const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1))
+  const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1))
+
+  const monthLabel = `${year}年${month + 1}月`
+
+  return (
+    <div className="settings-view">
+      <div className="admin-calendar-nav">
+        <button className="admin-calendar-nav__btn" onClick={prevMonth}>← 上月</button>
+        <span className="admin-calendar-nav__title">{monthLabel}</span>
+        <button className="admin-calendar-nav__btn" onClick={nextMonth}>下月 →</button>
+      </div>
+      <div className="admin-calendar-header">
+        {['日', '一', '二', '三', '四', '五', '六'].map((d) => (
+          <div key={d} className="admin-calendar-header-cell">{d}</div>
+        ))}
+      </div>
+      <div className="admin-calendar-grid">
+        {Array.from({ length: startOffset }, (_, i) => (
+          <div key={`empty-${i}`} className="admin-calendar-cell" style={{ opacity: 0.3 }} />
+        ))}
+        {Array.from({ length: daysInMonth }, (_, i) => {
+          const day = i + 1
+          const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+          const count = postDates.get(key) ?? 0
+          const isToday = key === todayKey
+          return (
+            <div
+              key={key}
+              className={`admin-calendar-cell${isToday ? ' today' : ''}${count > 0 ? ' has-post' : ''}`}
+              title={count > 0 ? `${count} 篇文章` : ''}
+            >
+              {day}
+              {count > 0 && (
+                <span style={{ fontSize: '0.65rem', color: 'var(--muted)', marginTop: 2 }}>{count}</span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ marginTop: 'var(--space-md)', display: 'flex', gap: 'var(--space-md)', fontSize: '0.82rem', color: 'var(--muted)' }}>
+        <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', marginRight: 4 }} />今天</span>
+        <span><span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', marginRight: 4 }} />有发布</span>
+        <span>共 {posts.length} 篇文章</span>
       </div>
     </div>
   )

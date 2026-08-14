@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useReadingHistory, ReadingHistoryItem } from '../hooks/useReadingHistory'
+import { getCheckinStats } from '../api'
+import { useEffect, useState } from 'react'
 import SEO from '../components/SEO'
 
 function timeAgo(ts: number): string {
@@ -69,6 +71,11 @@ function computeStats(history: ReadingHistoryItem[]) {
 export default function History() {
   const { history, remove, clear } = useReadingHistory()
   const stats = computeStats(history)
+  const [checkin, setCheckin] = useState<{ streak: number; total_checkins: number } | null>(null)
+
+  useEffect(() => {
+    getCheckinStats().then(setCheckin).catch(() => {})
+  }, [])
 
   return (
     <section className="posts-section">
@@ -113,6 +120,18 @@ export default function History() {
                 <span className="reading-stats__value">{stats.avgProgress}%</span>
                 <span className="reading-stats__label">平均进度</span>
               </div>
+              {checkin !== null && (
+                <>
+                  <div className="reading-stats__card">
+                    <span className="reading-stats__value">{checkin.streak}</span>
+                    <span className="reading-stats__label">连续天数</span>
+                  </div>
+                  <div className="reading-stats__card">
+                    <span className="reading-stats__value">{checkin.total_checkins}</span>
+                    <span className="reading-stats__label">打卡次数</span>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* 7 天阅读趋势 */}

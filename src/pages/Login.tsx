@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { loginVerify2fa, startGithubAuth } from '../api';
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, refreshUser } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -57,6 +57,8 @@ export default function Login() {
     setLoading(true);
     try {
       await loginVerify2fa(twofaToken, code.trim());
+      // 设置完成后，刷新 AuthContext 用户状态（复用已写入的 session cookie）
+      await refreshUser();
       navigate(redirect, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : t('auth.verifyFailed'));

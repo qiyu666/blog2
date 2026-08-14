@@ -21,9 +21,12 @@
 - 文章草稿与发布状态管理
 - 分类、标签、封面图
 - 文章自定义 JS（用户可为单篇文章注入自定义背景、音乐等）
+- **投稿模板**（教程类 / 随笔类 / 技术评测 / 更新日志 / 公告通知，一键生成文章结构）
+- **定时发布**（设置发布时间后文章将自动在指定时刻上线）
 - FTS5 全文搜索（覆盖标题、摘要、正文、标签）
 - RSS Feed 与 Sitemap
-- **Markdown 代码块语法高亮**（PrismJS 15 种语言 + Catppuccin 主题）
+- **Markdown 代码块语法高亮**（PrismJS 20+ 种语言 + Catppuccin 主题）
+- **LaTeX 数学公式支持**（KaTeX，行内 `$...$` 与块级 `$$...$$`）
 - **代码块一键复制**（复制按钮 + 成功提示）
 - **文章阅读进度条**（顶部渐变进度条，实时跟踪滚动位置，支持章节跳转和云端同步）
 - **文章字体大小调节**（A+/A− 按钮，80%-160% 缩放，localStorage 持久化）
@@ -33,6 +36,8 @@
 - **文章归档**（按年月分组的归档页面）
 - **标签云**（标签统计与按标签筛选）
 - **阅读历史**（本地存储阅读进度，"继续阅读"入口）
+- **阅读打卡**（每日阅读文章可打卡，统计连续阅读天数与总打卡次数）
+- **阅读记录卡片**（历史记录页新增连续天数、打卡次数统计）
 - **图片懒加载**（Intersection Observer + 模糊占位骨架屏动画）
 - **SEO 元数据优化**（Open Graph / Twitter Card / JSON-LD Article）
 
@@ -59,11 +64,12 @@
 - **个人主页作品集**（分类筛选 + 文章卡片列表 + 客户端分页）
 - **成就徽章系统**（7 种徽章：新手、勤奋、高产、人气、热门、互动、优质）
 - **互动数据统计**（被点赞、被收藏、被评论总数展示）
-- **社交联系方式**（GitHub、Twitter/X、QQ、微信、Telegram、B站、邮箱，共 7 种平台图标展示）
+- **社交联系方式**（GitHub、Twitter/X、QQ、微信、Telegram、B站、邮箱、Facebook、WhatsApp，共 9 种平台图标展示）
 - 安全设置（修改密码、TOTP 2FA）
 
 ### 管理后台
 - 仪表盘（数据概览）
+- **内容日历视图**（按月可视化文章发布密度，快速掌握内容节奏）
 - **访问统计仪表盘**（统计卡片 + 近 7 天趋势 SVG 柱状图 + 分类分布 + 热门文章 Top10 + 活跃用户 Top10）
 - **阅读趋势分析**（统计卡片 + 7天柱状图 + 常读作者TOP5）
 - 文章管理（编辑/删除/置顶/精选）
@@ -98,6 +104,8 @@
 ```
 blog2/
 ├── src/                        # 前端源码
+│   ├── utils/
+│   │   └── markdown.ts         #   Markdown 渲染（Prism + KaTeX）
 │   ├── auth/                   #   认证上下文与路由守卫
 │   ├── components/             #   通用组件
 │   │   ├── Header.tsx          #     导航栏 + 主题切换 + 通知菜单
@@ -250,18 +258,23 @@ npx wrangler d1 execute blog-db --file=./schema.sql
 npx wrangler d1 execute blog-db --remote --file=./schema.sql
 ```
 
-按顺序执行增量迁移（v2 → v13）：
+按顺序执行增量迁移（v2 → v18）：
 
 ```bash
 npx wrangler d1 execute blog-db --file=./schema-v2.sql
 npx wrangler d1 execute blog-db --file=./schema-v3.sql
-# ...依次执行到 v13
-# v9  添加社交联系方式字段（GitHub/Twitter/QQ/微信/Telegram/B站/邮箱）
-# v10 添加阅读历史表（reading_history）
-# v11 添加文章归档索引（posts.created_at）
-# v12 添加文章合集/专栏表（series、post_series）
-# v13 添加邮件订阅与友情链接表（subscriptions、friend_links）
-npx wrangler d1 execute blog-db --file=./schema-v13.sql
+# ...依次执行到 v18
+# v9   添加社交联系方式字段（GitHub/Twitter/QQ/微信/Telegram/B站/邮箱）
+# v10  添加阅读历史表（reading_history）
+# v11  添加文章归档索引（posts.created_at）
+# v12  添加文章合集/专栏表（series、post_series）
+# v13  添加邮件订阅与友情链接表（subscriptions、friend_links）
+# v14  添加邮件订阅确认状态
+# v15  添加阅读趋势数据
+# v16  添加自定义主页模块排序
+# v17  规范化 schema
+# v18  添加定时发布（posts.scheduled_at）与阅读打卡表（reading_checkins）
+npx wrangler d1 execute blog-db --remote --file=./schema-v18.sql
 ```
 
 ### 4. 配置环境变量
@@ -343,11 +356,13 @@ npm run deploy              # 部署到 Cloudflare Pages
 ### 用户接口（需登录）
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/posts` | 创建文章 |
+| POST | `/api/posts` | 创建文章（支持 `scheduled_at` 定时发布） |
 | PUT | `/api/posts/:id` | 编辑文章 |
 | POST | `/api/posts/:id/likes` | 点赞/取消点赞 |
 | POST | `/api/posts/:id/favorites` | 收藏/取消收藏 |
 | POST | `/api/posts/:id/comments` | 发表评论 |
+| POST | `/api/posts/:id/checkin` | 阅读打卡 |
+| GET | `/api/checkin` | 获取打卡统计（连续天数、总次数） |
 | POST | `/api/comments/:id/likes` | 评论点赞 |
 | POST | `/api/follows` | 关注/取消关注 |
 | GET | `/api/favorites` | 收藏列表 |
@@ -366,6 +381,7 @@ npm run deploy              # 部署到 Cloudflare Pages
 | POST | `/api/admin/promote` | 用户角色变更 |
 | GET | `/api/admin/analytics` | 数据分析 |
 | GET | `/api/admin/reports` | Bug 反馈管理 |
+| GET | `/api/admin/scheduled-publish` | 发布到期的定时文章（由 cron trigger 调用） |
 
 ## 数据库结构
 
@@ -389,6 +405,7 @@ npm run deploy              # 部署到 Cloudflare Pages
 - **subscriptions** — 邮件订阅（邮箱、退订 token、确认状态）
 - **friend_links** — 友情链接（名称、URL、描述、排序）
 - **reading_history** — 阅读历史（用户ID、文章slug、访问时间、阅读进度）
+- **reading_checkins** — 阅读打卡（用户ID、文章ID、打卡日期，用于统计连续天数）
 
 ## 在其他电脑上运行
 

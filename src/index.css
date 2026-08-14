@@ -2191,6 +2191,19 @@ input, textarea, select {
   font-weight: 300;
 }
 
+.scheduled-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.55rem;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  color: #8b5cf6;
+  font-variant-numeric: tabular-nums;
+}
+
 .article__pvuv {
   font-size: 0.8125rem;
   color: var(--text-soft, #666);
@@ -16609,4 +16622,176 @@ a.profile-stat {
   .admin-batch-bar {
     flex-wrap: wrap;
   }
+}
+
+/* ========================================
+   数学公式样式（KaTeX）
+   ======================================== */
+.math-block {
+  margin: 1rem 0;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.math-inline {
+  white-space: nowrap;
+}
+
+.article__body .katex-display {
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* 代码块头部语言标签已内联在代码高亮逻辑中 */
+
+/* ========================================
+   定时发布样式
+   ======================================== */
+.editor-form__input--datetime {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  color: var(--ink);
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg-deep);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 220px;
+}
+.editor-form__input--datetime:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.12);
+}
+.editor-form__scheduled-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+  padding: 0.2rem 0.6rem;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  color: #8b5cf6;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ========================================
+   阅读打卡样式
+   ======================================== */
+.checkin-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  padding: 0.6rem 0.85rem;
+  margin-top: 0.75rem;
+  background: rgba(34, 197, 94, 0.06);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: var(--radius-md);
+}
+.checkin-hint--done {
+  color: #15803d;
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+.streak-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.12), rgba(239, 68, 68, 0.1));
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  border-radius: var(--radius-pill);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+.admin-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  padding: 1rem;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line-soft);
+}
+.admin-calendar-cell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  cursor: default;
+  position: relative;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+.admin-calendar-cell:hover {
+  border-color: var(--line);
+  background: var(--bg-deep);
+}
+.admin-calendar-cell.today {
+  border-color: var(--accent);
+  background: rgba(255, 107, 53, 0.08);
+  color: var(--accent);
+  font-weight: 700;
+}
+.admin-calendar-cell.has-post::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  position: absolute;
+  bottom: 4px;
+}
+.admin-calendar-cell.today.has-post::after {
+  background: var(--accent);
+}
+.admin-calendar-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  padding: 0 1rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.admin-calendar-header-cell {
+  text-align: center;
+}
+.admin-calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.admin-calendar-nav__title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.admin-calendar-nav__btn {
+  padding: 0.35rem 0.75rem;
+  background: var(--bg-deep);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.admin-calendar-nav__btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }

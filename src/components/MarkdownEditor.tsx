@@ -1,5 +1,6 @@
-import { useState, useRef, useMemo } from 'react'
-import DOMPurify from 'dompurify'
+import { useState, useRef, useMemo, useEffect } from 'react'
+import { renderMarkdown, applyKaTeX, applyPrism } from '../utils/markdown'
+import 'katex/dist/katex.min.css'
 
 interface Props {
   value: string
@@ -21,7 +22,15 @@ export default function MarkdownEditor({
   const [mode, setMode] = useState<'write' | 'preview'>('write')
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
-  const html = useMemo(() => renderMarkdown(value), [value])
+  const html = useMemo(() => renderMarkdown(value, { allowMath: true }), [value])
+  const previewRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = previewRef.current
+    if (!el) return
+    applyKaTeX(el)
+    applyPrism(el)
+  }, [html])
 
   /** 在当前光标位置插入/包裹文本 */
   function wrapSelection(prefix: string, suffix: string = prefix, placeholder = '') {
@@ -296,6 +305,7 @@ export default function MarkdownEditor({
         />
       ) : (
         <div
+          ref={previewRef}
           className="md-editor__preview article__body"
           style={{ minHeight }}
           dangerouslySetInnerHTML={{ __html: html || '<p style="color:var(--text-soft)">还没有内容</p>' }}
@@ -303,88 +313,4 @@ export default function MarkdownEditor({
       )}
     </div>
   )
-}
-
-// ---- Markdown 渲染（与 PostDetail 保持一致） ----
-function renderMarkdown(md: string): string {
-  const lines = md.split('\n')
-  let html = ''
-  let inList = false
-  let inCode = false
-  let codeBuffer: string[] = []
-
-  function inline(text: string): string {
-    // 第 1 步：先提取 Markdown 链接和图片（避免 &< > 转义破坏 URL）
-    const placeholders: string[] = []
-    const stash = (html: string) => {
-      placeholders.push(html)
-      return `\x00PLACEHOLDER_${placeholders.length - 1}\x00`
-    }
-    let processed = text
-      // ![alt](url)
-      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) =>
-        stash(`<img src="${url}" alt="${alt}" loading="lazy" style="max-width:100%;border-radius:8px;" />`),
-      )
-      // [text](url)
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) =>
-        stash(`<a href="${url}" target="_blank" rel="noreferrer noopener">${label}</a>`),
-      )
-    // 第 2 步：转义剩余的 HTML 特殊字符
-    processed = processed
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-    // 第 3 步：还原占位符
-    processed = processed.replace(
-      /\x00PLACEHOLDER_(\d+)\x00/g,
-      (_, i) => placeholders[Number(i)] ?? '',
-    )
-    return processed
-  }
-
-  for (const line of lines) {
-    if (line.trim().startsWith('```')) {
-      if (inCode) {
-        html += `<pre><code>${codeBuffer.join('\n').replace(/</g, '&lt;')}</code></pre>\n`
-        codeBuffer = []
-        inCode = false
-      } else {
-        if (inList) { html += '</ul>\n'; inList = false }
-        inCode = true
-      }
-      continue
-    }
-    if (inCode) {
-      codeBuffer.push(line)
-      continue
-    }
-    if (/^###\s/.test(line)) {
-      if (inList) { html += '</ul>\n'; inList = false }
-      html += `<h3>${inline(line.replace(/^###\s/, ''))}</h3>\n`
-    } else if (/^##\s/.test(line)) {
-      if (inList) { html += '</ul>\n'; inList = false }
-      html += `<h2>${inline(line.replace(/^##\s/, ''))}</h2>\n`
-    } else if (/^#\s/.test(line)) {
-      if (inList) { html += '</ul>\n'; inList = false }
-      html += `<h1>${inline(line.replace(/^#\s/, ''))}</h1>\n`
-    } else if (/^>\s/.test(line)) {
-      if (inList) { html += '</ul>\n'; inList = false }
-      html += `<blockquote>${inline(line.replace(/^>\s/, ''))}</blockquote>\n`
-    } else if (/^[-*]\s/.test(line)) {
-      if (!inList) { html += '<ul>\n'; inList = true }
-      html += `<li>${inline(line.replace(/^[-*]\s/, ''))}</li>\n`
-    } else if (line.trim() === '') {
-      if (inList) { html += '</ul>\n'; inList = false }
-    } else {
-      if (inList) { html += '</ul>\n'; inList = false }
-      html += `<p>${inline(line)}</p>\n`
-    }
-  }
-  if (inList) html += '</ul>\n'
-  if (inCode) html += `<pre><code>${codeBuffer.join('\n').replace(/</g, '&lt;')}</code></pre>\n`
-  // 用 DOMPurify 过滤 XSS
-  return DOMPurify.sanitize(html, { ADD_ATTR: ['target', 'rel'] })
 }

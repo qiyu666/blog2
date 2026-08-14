@@ -18,7 +18,7 @@ import 'prismjs/components/prism-yaml'
 import 'prismjs/components/prism-markdown'
 import type { Post } from '../types'
 import { getSharedPostByToken } from '../api'
-import { renderMarkdown } from './PostDetail'
+import { renderMarkdown } from '../utils/markdown'
 import SEO from '../components/SEO'
 
 export default function SharedPost() {

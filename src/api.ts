@@ -1106,3 +1106,25 @@ export async function postHeartbeat(postId: number, sessionId: string): Promise<
     // 静默失败
   }
 }
+
+export interface CheckinStats {
+  checkins: string[]
+  streak: number
+  total_checkins: number
+}
+
+export async function getCheckinStats(): Promise<CheckinStats> {
+  const res = await fetch('/api/checkin', { credentials: 'include' })
+  if (!res.ok) return { checkins: [], streak: 0, total_checkins: 0 }
+  return res.json()
+}
+
+export async function postCheckin(postId: number): Promise<boolean> {
+  const res = await fetch('/api/checkin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ post_id: postId }),
+  })
+  return res.ok
+}

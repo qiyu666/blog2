@@ -3,6 +3,7 @@ import type { PostInput } from '../types'
 import { getCategories, type PublicCategory } from '../api'
 import MarkdownEditor from './MarkdownEditor'
 import CoverUploader from './CoverUploader'
+import { POST_TEMPLATES, type PostTemplateKey } from '../utils/markdown'
 
 interface Props {
   initial?: Partial<PostInput>
@@ -257,6 +258,7 @@ export default function PostForm({
     published: initial?.published ?? 1,
     custom_js: initial?.custom_js ?? '',
     password: initial?.password ?? '',
+    scheduled_at: initial?.scheduled_at ?? null,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -265,6 +267,22 @@ export default function PostForm({
   const [tagInput, setTagInput] = useState('')
   const [showSettings, setShowSettings] = useState(false)
   const [categories, setCategories] = useState<PublicCategory[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState<PostTemplateKey>('none')
+
+  function applyTemplate(key: PostTemplateKey) {
+    if (key === 'none') {
+      setSelectedTemplate('none')
+      return
+    }
+    const tpl = POST_TEMPLATES[key]
+    if (!tpl) return
+    setSelectedTemplate(key)
+    setForm((prev) => ({
+      ...prev,
+      content: tpl.content,
+      category: tpl.frontmatter.category ?? prev.category,
+    }))
+  }
 
   // 加载分类列表
   useEffect(() => {
@@ -705,7 +723,7 @@ export default function PostForm({
               />
             </div>
 
-            {/* Publish status (edit mode only) */}
+            {/* 发布状态 (edit mode only) */}
             {!isNewMode && (
               <div className="editor-form__advanced-row">
                 <label className="editor-form__advanced-label">发布状态</label>
@@ -729,6 +747,51 @@ export default function PostForm({
                     <span>草稿</span>
                   </label>
                 </div>
+              </div>
+            )}
+
+            {/* 定时发布 */}
+            <div className="editor-form__advanced-row">
+              <div className="editor-form__advanced-header">
+                <label className="editor-form__advanced-label">定时发布</label>
+                <span className="editor-form__advanced-hint">
+                  设置后将在指定时间自动发布（需登录状态）
+                </span>
+              </div>
+              <input
+                className="editor-form__input editor-form__input--datetime"
+                type="datetime-local"
+                value={form.scheduled_at ? form.scheduled_at.slice(0, 16) : ''}
+                min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                onChange={(e) => update('scheduled_at', e.target.value ? e.target.value + ':00' : null)}
+              />
+              {form.scheduled_at && (
+                <span className="editor-form__scheduled-badge">
+                  🕐 {new Date(form.scheduled_at).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
+
+            {/* 投稿模板（仅新建时显示） */}
+            {isNewMode && (
+              <div className="editor-form__advanced-row">
+                <div className="editor-form__advanced-header">
+                  <label className="editor-form__advanced-label">投稿模板</label>
+                  <span className="editor-form__advanced-hint">
+                    选择模板将自动生成文章结构，可后续编辑
+                  </span>
+                </div>
+                <select
+                  className="editor-form__meta-select"
+                  value={selectedTemplate}
+                  onChange={(e) => applyTemplate(e.target.value as PostTemplateKey)}
+                >
+                  {Object.entries(POST_TEMPLATES).map(([key, tpl]) => (
+                    <option key={key} value={key}>
+                      {tpl.label} — {tpl.description}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 

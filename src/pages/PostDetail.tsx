@@ -1,21 +1,5 @@
 import { useEffect, useState, useCallback, FormEvent, useRef } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import Prism from 'prismjs'
-import 'prismjs/components/prism-javascript'
-import 'prismjs/components/prism-typescript'
-import 'prismjs/components/prism-python'
-import 'prismjs/components/prism-bash'
-import 'prismjs/components/prism-css'
-import 'prismjs/components/prism-json'
-import 'prismjs/components/prism-sql'
-import 'prismjs/components/prism-markup'
-import 'prismjs/components/prism-java'
-import 'prismjs/components/prism-c'
-import 'prismjs/components/prism-cpp'
-import 'prismjs/components/prism-go'
-import 'prismjs/components/prism-rust'
-import 'prismjs/components/prism-yaml'
-import 'prismjs/components/prism-markdown'
 import type { Post, Comment } from '../types'
 import {
   getPost,
@@ -50,151 +34,13 @@ import SocialLinks from '../components/SocialLinks'
 import RevisionHistory from '../components/RevisionHistory'
 import ImageLightbox from '../components/ImageLightbox'
 import type { LightboxImage } from '../components/ImageLightbox'
-import DOMPurify from 'dompurify'
+import { renderMarkdown, applyKaTeX, langLabel } from '../utils/markdown'
+import Prism from 'prismjs'
+import 'katex/dist/katex.min.css'
 
-/** Minimal markdown → HTML renderer (headings, lists, code, blockquote, bold, italic) */
-export function renderMarkdown(
-  md: string,
-  options: { images?: boolean; mentions?: boolean } = {},
-): string {
-  const { images = true, mentions = false } = options
-  const lines = md.split('\n')
-  let html = ''
-  let inList = false
-  let inCode = false
-  let codeBuffer: string[] = []
-  let codeLang = ''
-  const slugCounter = new Map<string, number>()
-
-  // 为标题生成稳定的 slug 锚点，重名时自动追加 -2 -3
-  function headingId(text: string): string {
-    const base = text
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}\s-]/gu, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '')
-      || 'section'
-    const n = (slugCounter.get(base) || 0) + 1
-    slugCounter.set(base, n)
-    return n === 1 ? base : `${base}-${n}`
-  }
-
-  // 把 inline() 产生的 HTML 还原为纯文本，供 headingId 使用
-  function stripInline(html: string): string {
-    return html
-      .replace(/<[^>]+>/g, '')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-  }
-
-  function inline(text: string): string {
-    // 第 1 步：先提取 Markdown 链接和图片（避免 &< > 转义破坏 URL）
-    const placeholders: string[] = []
-    const stash = (html: string) => {
-      placeholders.push(html)
-      return `\x00PLACEHOLDER_${placeholders.length - 1}\x00`
-    }
-    let processed = text
-    // ![alt](url) — 仅文章正文允许图片，评论中禁用
-    if (images) {
-      processed = processed
-        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) =>
-          stash(`<img src="${url}" alt="${alt}" loading="lazy" class="lazy-load" onerror="this.classList.add('loaded')" onload="this.classList.add('loaded')" style="max-width:100%;border-radius:8px;margin:0.5rem 0;" />`),
-        )
-    }
-    processed = processed
-      // [text](url)
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) =>
-        stash(`<a href="${url}" target="_blank" rel="noreferrer noopener">${label}</a>`),
-      )
-    // 评论 @username 提及 → 可点击链接（在转义之前 stash，避免被破坏；代码块不走 inline，故不受影响）
-    if (mentions) {
-      processed = processed.replace(
-        /(?<![a-zA-Z0-9_])@([a-zA-Z0-9_]{3,20})/g,
-        (_, username) => stash(`<a href="/${username}" class="mention">@${username}</a>`),
-      )
-    }
-    // 第 2 步：转义剩余的 HTML 特殊字符和行内格式
-    processed = processed
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-    // 第 3 步：还原占位符
-    processed = processed.replace(
-      /\x00PLACEHOLDER_(\d+)\x00/g,
-      (_, i) => placeholders[Number(i)] ?? '',
-    )
-    return processed
-  }
-
-  for (const line of lines) {
-    if (line.trim().startsWith('```')) {
-      if (inCode) {
-        html += `<pre class="code-block" data-lang="${codeLang || 'text'}"><code class="language-${codeLang || 'text'}">${codeBuffer.join('\n').replace(/</g, '&lt;')}</code></pre>\n`
-        codeBuffer = []
-        inCode = false
-        codeLang = ''
-      } else {
-        if (inList) { html += '</ul>\n'; inList = false }
-        codeLang = line.trim().replace(/^```/, '').trim()
-        inCode = true
-      }
-      continue
-    }
-    if (inCode) {
-      codeBuffer.push(line)
-      continue
-    }
-    if (/^#####\s/.test(line)) {
-      if (inList) { html += '</ul>\n'; inList = false }
-      const raw = line.replace(/^#####\s/, '')
-      const t = inline(raw)
-      html += `<h5 id="${headingId(stripInline(t))}">${t}</h5>\n`
-    } else if (/^####\s/.test(line)) {
-      if (inList) { html += '</ul>\n'; inList = false }
-      const raw = line.replace(/^####\s/, '')
-      const t = inline(raw)
-      html += `<h4 id="${headingId(stripInline(t))}">${t}</h4>\n`
-    } else if (/^###\s/.test(line)) {
-      if (inList) { html += '</ul>\n'; inList = false }
-      const raw = line.replace(/^###\s/, '')
-      const t = inline(raw)
-      html += `<h3 id="${headingId(stripInline(t))}">${t}</h3>\n`
-    } else if (/^##\s/.test(line)) {
-      if (inList) { html += '</ul>\n'; inList = false }
-      const raw = line.replace(/^##\s/, '')
-      const t = inline(raw)
-      html += `<h2 id="${headingId(stripInline(t))}">${t}</h2>\n`
-    } else if (/^#\s/.test(line)) {
-      if (inList) { html += '</ul>\n'; inList = false }
-      const raw = line.replace(/^#\s/, '')
-      const t = inline(raw)
-      html += `<h1 id="${headingId(stripInline(t))}">${t}</h1>\n`
-    } else if (/^>\s/.test(line)) {
-      if (inList) { html += '</ul>\n'; inList = false }
-      html += `<blockquote>${inline(line.replace(/^>\s/, ''))}</blockquote>\n`
-    } else if (/^[-*]\s/.test(line)) {
-      if (!inList) { html += '<ul>\n'; inList = true }
-      html += `<li>${inline(line.replace(/^[-*]\s/, ''))}</li>\n`
-    } else if (line.trim() === '') {
-      if (inList) { html += '</ul>\n'; inList = false }
-    } else {
-      if (inList) { html += '</ul>\n'; inList = false }
-      html += `<p>${inline(line)}</p>\n`
-    }
-  }
-  if (inList) html += '</ul>\n'
-  if (inCode) html += `<pre class="code-block" data-lang="${codeLang || 'text'}"><code class="language-${codeLang || 'text'}">${codeBuffer.join('\n').replace(/</g, '&lt;')}</code></pre>\n`
-  // 用 DOMPurify 过滤 XSS：移除 javascript: 协议链接、事件处理器等危险内容
-  return DOMPurify.sanitize(html, {
-    ADD_ATTR: ['target', 'rel', 'class', 'data-lang'],
-    FORBID_TAGS: images ? [] : ['img'],
-  })
+/** Render comment content as sanitized Markdown HTML. */
+function renderCommentContent(content: string): string {
+  return renderMarkdown(content, { mentions: true })
 }
 
 /** 从 markdown 内容提取标题，用于生成 TOC */
@@ -245,49 +91,6 @@ function formatRelative(dateStr: string): string {
   const day = Math.floor(hr / 24)
   if (day < 30) return `${day} 天前`
   return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
-}
-
-/** 代码块语言标识 → 中文展示名 */
-const LANG_LABELS: Record<string, string> = {
-  javascript: 'JavaScript',
-  js: 'JavaScript',
-  typescript: 'TypeScript',
-  ts: 'TypeScript',
-  python: 'Python',
-  py: 'Python',
-  bash: 'Bash',
-  sh: 'Shell',
-  shell: 'Shell',
-  css: 'CSS',
-  json: 'JSON',
-  sql: 'SQL',
-  html: 'HTML',
-  markup: 'HTML',
-  java: 'Java',
-  c: 'C',
-  cpp: 'C++',
-  'c++': 'C++',
-  go: 'Go',
-  rust: 'Rust',
-  rs: 'Rust',
-  yaml: 'YAML',
-  yml: 'YAML',
-  markdown: 'Markdown',
-  md: 'Markdown',
-  text: '纯文本',
-  '': '代码',
-}
-
-function langLabel(lang: string): string {
-  const key = (lang || '').toLowerCase().trim()
-  return LANG_LABELS[key] || (key ? key.toUpperCase().slice(0, 1) + key.slice(1) : '代码')
-}
-
-/** Render comment content as sanitized Markdown HTML.
- *  Supports bold/italic/inline code/code blocks/links/lists/blockquotes (no images),
- *  and converts @username mentions into clickable internal links. */
-function renderCommentContent(content: string): string {
-  return renderMarkdown(content, { images: false, mentions: true })
 }
 
 export default function PostDetail() {
@@ -772,6 +575,27 @@ export default function PostDetail() {
       wrap.appendChild(pre)
     })
   }, [post])
+
+  // KaTeX 数学公式渲染
+  useEffect(() => {
+    if (!post) return
+    const body = document.querySelector<HTMLDivElement>('.article__body')
+    if (body) applyKaTeX(body)
+  }, [post])
+
+  // 阅读打卡：用户登录且文章已发布时，自动记录打卡
+  useEffect(() => {
+    if (!post || !user || !post.published) return
+    const id = setTimeout(() => {
+      fetch('/api/checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ post_id: post.id }),
+      }).catch(() => {})
+    }, 3000)
+    return () => clearTimeout(id)
+  }, [post?.id, user])
 
   // 图片懒加载 + 模糊占位
   useEffect(() => {
@@ -1623,6 +1447,14 @@ export default function PostDetail() {
             )}
             <span className="article__meta-divider">·</span>
             <span>约 {estimateReadingTime(post.content)} 分钟</span>
+            {post.scheduled_at && (
+              <>
+                <span className="article__meta-divider">·</span>
+                <span className="scheduled-badge">
+                  🕐 定时发布 · {new Date(post.scheduled_at + 'Z').toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </>
+            )}
           </div>
           {authorProfile && <SocialLinks user={authorProfile} size="sm" />}
         </header>
