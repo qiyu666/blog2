@@ -25,6 +25,12 @@ export default function Settings() {
   const [socialWhatsapp, setSocialWhatsapp] = useState('')
   const [tippingWechatQr, setTippingWechatQr] = useState('')
   const [tippingAlipayQr, setTippingAlipayQr] = useState('')
+  const [tippingWechatUploading, setTippingWechatUploading] = useState(false)
+  const [tippingAlipayUploading, setTippingAlipayUploading] = useState(false)
+  const tippingWechatFileRef = useRef<HTMLInputElement | null>(null)
+  const tippingAlipayFileRef = useRef<HTMLInputElement | null>(null)
+  const [tippingWechatDrag, setTippingWechatDrag] = useState(false)
+  const [tippingAlipayDrag, setTippingAlipayDrag] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -268,6 +274,43 @@ export default function Settings() {
     if (file) {
       void uploadAvatarFile(file)
     }
+  }
+
+  async function uploadTippingFile(file: File, setUrl: React.Dispatch<React.SetStateAction<string>>, setUploading: React.Dispatch<React.SetStateAction<boolean>>) {
+    if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) return
+    setUploading(true)
+    try {
+      const base64 = await compressImage(file, 512)
+      const res = await fetch('/api/upload-avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64 }),
+      })
+      if (!res.ok) throw new Error('上传失败')
+      const data = await res.json() as { data?: { link?: string } }
+      const url = data?.data?.link
+      if (url) setUrl(url)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  function handleTippingWechatDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    e.stopPropagation()
+    setTippingWechatDrag(false)
+    if (tippingWechatUploading) return
+    const file = e.dataTransfer.files?.[0]
+    if (file) void uploadTippingFile(file, setTippingWechatQr, setTippingWechatUploading)
+  }
+
+  function handleTippingAlipayDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    e.stopPropagation()
+    setTippingAlipayDrag(false)
+    if (tippingAlipayUploading) return
+    const file = e.dataTransfer.files?.[0]
+    if (file) void uploadTippingFile(file, setTippingAlipayQr, setTippingAlipayUploading)
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -833,10 +876,27 @@ export default function Settings() {
           <div className="settings-tipping">
             <div className="settings-tipping__field">
               <label className="settings-tipping__label">
-                💳 微信收款二维码图片 URL
+                <WeChatBrandIcon /> 微信收款二维码
               </label>
+              <div
+                className={`tipping-upload ${tippingWechatDrag ? 'tipping-upload--drag' : ''}`}
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setTippingWechatDrag(true) }}
+                onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setTippingWechatDrag(false) }}
+                onDrop={handleTippingWechatDrop}
+                onClick={() => tippingWechatFileRef.current?.click()}
+              >
+                {tippingWechatQr ? (
+                  <img src={tippingWechatQr} alt="微信收款二维码" className="tipping-upload__preview" />
+                ) : (
+                  <>
+                    <span className="tipping-upload__placeholder-icon">+</span>
+                    <span className="tipping-upload__text">{tippingWechatUploading ? '上传中…' : '点击或拖拽上传'}</span>
+                  </>
+                )}
+                <input ref={tippingWechatFileRef} type="file" accept="image/*" className="tipping-upload__input" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadTippingFile(f, setTippingWechatQr, setTippingWechatUploading); e.target.value = '' }} />
+              </div>
               <input
-                className="form__input"
+                className="form__input form__input--url"
                 type="text"
                 value={tippingWechatQr}
                 onChange={(e) => setTippingWechatQr(e.target.value)}
@@ -846,10 +906,27 @@ export default function Settings() {
             </div>
             <div className="settings-tipping__field">
               <label className="settings-tipping__label">
-                💳 支付宝收款二维码图片 URL
+                <AlipayBrandIcon /> 支付宝收款二维码
               </label>
+              <div
+                className={`tipping-upload ${tippingAlipayDrag ? 'tipping-upload--drag' : ''}`}
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setTippingAlipayDrag(true) }}
+                onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setTippingAlipayDrag(false) }}
+                onDrop={handleTippingAlipayDrop}
+                onClick={() => tippingAlipayFileRef.current?.click()}
+              >
+                {tippingAlipayQr ? (
+                  <img src={tippingAlipayQr} alt="支付宝收款二维码" className="tipping-upload__preview" />
+                ) : (
+                  <>
+                    <span className="tipping-upload__placeholder-icon">+</span>
+                    <span className="tipping-upload__text">{tippingAlipayUploading ? '上传中…' : '点击或拖拽上传'}</span>
+                  </>
+                )}
+                <input ref={tippingAlipayFileRef} type="file" accept="image/*" className="tipping-upload__input" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadTippingFile(f, setTippingAlipayQr, setTippingAlipayUploading); e.target.value = '' }} />
+              </div>
               <input
-                className="form__input"
+                className="form__input form__input--url"
                 type="text"
                 value={tippingAlipayQr}
                 onChange={(e) => setTippingAlipayQr(e.target.value)}
@@ -1145,6 +1222,22 @@ function GithubIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M12 .5C5.37.5 0 5.78 0 12.29c0 5.2 3.44 9.61 8.21 11.16.6.11.82-.25.82-.56 0-.28-.01-1.02-.02-2-3.34.71-4.04-1.58-4.04-1.58-.55-1.36-1.34-1.72-1.34-1.72-1.09-.73.08-.72.08-.72 1.21.08 1.85 1.22 1.85 1.22 1.07 1.8 2.81 1.28 3.5.98.11-.76.42-1.28.76-1.57-2.67-.3-5.47-1.31-5.47-5.83 0-1.29.47-2.34 1.24-3.17-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.21a11.6 11.6 0 0 1 6 0c2.29-1.53 3.3-1.21 3.3-1.21.66 1.66.24 2.88.12 3.18.77.83 1.24 1.88 1.24 3.17 0 4.53-2.81 5.53-5.49 5.82.43.36.81 1.08.81 2.18 0 1.58-.01 2.85-.01 3.24 0 .31.22.68.83.56A12.04 12.04 0 0 0 24 12.29C24 5.78 18.63.5 12 .5z" />
+    </svg>
+  )
+}
+
+function WeChatBrandIcon() {
+  return (
+    <svg className="tipping-brand-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.86c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 0 1 .598.082l1.584.926a.272.272 0 0 0 .14.047c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 0 1 .193-.555C23.156 18.437 24 16.743 24 14.886c0-3.302-3.05-5.989-6.84-6.034zm-2.293 3.2c.534 0 .967.44.967.983a.976.976 0 0 1-.967.984.976.976 0 0 1-.967-.984c0-.543.433-.983.967-.983zm4.844 0c.534 0 .967.44.967.983a.976.976 0 0 1-.967.984.976.976 0 0 1-.967-.984c0-.543.433-.983.967-.983z" />
+    </svg>
+  )
+}
+
+function AlipayBrandIcon() {
+  return (
+    <svg className="tipping-brand-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M21.422 14.752c-1.386-.814-3.015-1.294-4.704-1.374-.264-.012-.528-.018-.792-.018-1.078 0-2.112.18-3.048.504-.24-.72-.582-1.392-1.014-2.004 1.56-.828 2.76-2.136 3.378-3.72.18-.456.3-1.056.3-1.62 0-2.88-2.34-5.22-5.22-5.22S3.708 3.54 3.708 6.42c0 .564.12 1.164.3 1.62.618 1.584 1.818 2.892 3.378 3.72-.432.612-.774 1.284-1.014 2.004-.936-.324-1.97-.504-3.048-.504-.264 0-.528.006-.792.018-1.689.08-3.318.56-4.704 1.374C.42 15.444 0 16.62 0 17.892c0 .108.006.216.018.324 1.386.814 3.015 1.294 4.704 1.374.264.012.528.018.792.018 1.078 0 2.112-.18 3.048-.504.24.72.582 1.392 1.014 2.004-1.56.828-2.76 2.136-3.378 3.72-.18.456-.3 1.056-.3 1.62 0 2.88 2.34 5.22 5.22 5.22s5.22-2.34 5.22-5.22c0-.564-.12-1.164-.3-1.62-.618-1.584-1.818-2.892-3.378-3.72.432-.612.774-1.284 1.014-2.004.936.324 1.97.504 3.048.504.264 0.528-.006-.216-.792-.018-1.689-.08-3.318-.56-4.704-1.374.012-.108.018-.216.018-.324 0-1.272-.42-2.448-1.134-3.14zm-9.582 6.096c-2.016 0-3.654-1.638-3.654-3.654s1.638-3.654 3.654-3.654 3.654 1.638 3.654 3.654-1.638 3.654-3.654 3.654zm0-5.688c-1.122 0-2.034.912-2.034 2.034s.912 2.034 2.034 2.034 2.034-.912 2.034-2.034-.912-2.034-2.034-2.034z" />
     </svg>
   )
 }
