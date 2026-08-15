@@ -60,7 +60,6 @@ export default function UserProfile() {
       .then((p) => {
         setProfile(p)
         setIsFollowing(!!p.is_following)
-        loadFriendStatus()
         setLoading(false)
       })
       .catch((err) => {
@@ -68,6 +67,11 @@ export default function UserProfile() {
         setLoading(false)
       })
   }, [username])
+
+  useEffect(() => {
+    if (!profile || !currentUser) return
+    loadFriendStatus()
+  }, [profile, currentUser])
 
   useEffect(() => {
     const css = profile?.user.profile_css
