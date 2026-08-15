@@ -9,11 +9,14 @@ interface SocialLinksProps {
     social_email?: string
     social_facebook?: string
     social_whatsapp?: string
+    tipping_wechat_qr?: string
+    tipping_alipay_qr?: string
   }
   size?: 'sm' | 'md'
+  onTip?: () => void
 }
 
-export default function SocialLinks({ user, size = 'md' }: SocialLinksProps) {
+export default function SocialLinks({ user, size = 'md', onTip }: SocialLinksProps) {
   const links: Array<{
     key: string
     cls: string
@@ -103,7 +106,7 @@ export default function SocialLinks({ user, size = 'md' }: SocialLinksProps) {
     })
   }
 
-  if (links.length === 0) return null
+  if (links.length === 0 && !onTip) return null
 
   const sizeClass = size === 'sm' ? 'social-link--sm' : ''
 
@@ -130,6 +133,16 @@ export default function SocialLinks({ user, size = 'md' }: SocialLinksProps) {
             {l.icon}
           </span>
         )
+      )}
+      {onTip && (
+        <button
+          type="button"
+          className={`social-link social-link--tip ${sizeClass}`.trim()}
+          onClick={onTip}
+          title="请作者喝杯奶茶"
+        >
+          🧋
+        </button>
       )}
     </div>
   )

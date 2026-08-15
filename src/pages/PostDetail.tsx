@@ -1461,7 +1461,7 @@ export default function PostDetail() {
               </>
             )}
           </div>
-          {authorProfile && <SocialLinks user={authorProfile} size="sm" />}
+          {authorProfile && <SocialLinks user={authorProfile} size="sm" onTip={() => setTippingOpen(true)} />}
         </header>
 
         {post.cover_image && (
@@ -1558,15 +1558,6 @@ export default function PostDetail() {
               >
                 <span className="action-btn__icon">{favorited ? '★' : '☆'}</span>
                 <span className="action-btn__count">{favorited ? '已收藏' : '收藏'}</span>
-              </button>
-              <button
-                type="button"
-                className="action-btn action-btn--tip"
-                onClick={() => setTippingOpen(true)}
-                title="请作者喝杯奶茶"
-              >
-                <span className="action-btn__icon">🧋</span>
-                <span className="action-btn__count">请作者喝杯奶茶 🧋</span>
               </button>
               <button
                 type="button"
