@@ -29,29 +29,7 @@ export default function Mailbox() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [toast, setToast] = useState<string | null>(null)
-  const [notifPermission, setNotifPermission] = useState<NotificationPermission>(() =>
-    typeof Notification !== 'undefined' ? Notification.permission : 'denied'
-  )
   const prevCountRef = useRef(0)
-  const loadedRef = useRef(false)
-
-  const requestNotifPermission = useCallback(async () => {
-    if (typeof Notification === 'undefined') return
-    if (Notification.permission === 'granted') return
-    const perm = await Notification.requestPermission()
-    setNotifPermission(perm)
-  }, [])
-
-  const showDesktopNotif = useCallback((fromUsername: string, subject: string) => {
-    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
-    if (!document.hidden) return
-    try {
-      new Notification('Marginalia 新消息', {
-        body: `来自 @${fromUsername}：${subject}`,
-        icon: '/favicon.svg',
-      })
-    } catch {}
-  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -59,10 +37,8 @@ export default function Mailbox() {
     try {
       const data = await getMessages(box)
       if (box === 'inbox' && prevCountRef.current > 0 && data.length > prevCountRef.current) {
-        const newMsg = data[0]
         setToast(t('mailbox.newMessage'))
         setTimeout(() => setToast(null), 3000)
-        if (document.hidden) showDesktopNotif(newMsg.from_username || '?', newMsg.subject)
       }
       prevCountRef.current = data.length
       setMessages(data)
@@ -71,29 +47,18 @@ export default function Mailbox() {
     } finally {
       setLoading(false)
     }
-  }, [box, t, showDesktopNotif])
+  }, [box, t])
 
   useEffect(() => {
-    if (!loadedRef.current) {
-      loadedRef.current = true
-      prevCountRef.current = 0
-      load()
-    }
+    prevCountRef.current = 0
+    load()
   }, [load])
 
-  // 页面切回时立即刷新一次
-  useEffect(() => {
-    const onVisChange = () => {
-      if (!document.hidden && box === 'inbox' && loadedRef.current) load()
-    }
-    document.addEventListener('visibilitychange', onVisChange)
-    return () => document.removeEventListener('visibilitychange', onVisChange)
-  }, [box, load])
-
-  // 仅收件箱时自动轮询，每 2 秒一次；切出标签页时也继续轮询以触发桌面通知
   useEffect(() => {
     if (box !== 'inbox') return
-    const interval = setInterval(load, 2000)
+    const interval = setInterval(() => {
+      if (!document.hidden) load()
+    }, 2000)
     return () => clearInterval(interval)
   }, [box, load])
 
@@ -127,19 +92,9 @@ export default function Mailbox() {
             </a>
           </p>
         </div>
-        <div className="mailbox__head-actions">
-          <button
-            type="button"
-            className="btn-secondary btn-small"
-            onClick={requestNotifPermission}
-            title={notifPermission === 'granted' ? '桌面通知已开启' : '开启桌面通知'}
-          >
-            {notifPermission === 'granted' ? '🔔 通知已开启' : '🔕 启用桌面通知'}
-          </button>
-          <Link to="/mailbox/new" className="btn-primary">
-            写信
-          </Link>
-        </div>
+        <Link to="/mailbox/new" className="btn-primary">
+          写信
+        </Link>
       </div>
 
       <div className="mailbox__tabs">
