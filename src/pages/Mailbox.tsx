@@ -60,7 +60,7 @@ export default function Mailbox() {
     if (box !== 'inbox') return
     const interval = setInterval(() => {
       if (!document.hidden) load()
-    }, 5000)
+    }, 2000)
     return () => clearInterval(interval)
   }, [box, load])
 
