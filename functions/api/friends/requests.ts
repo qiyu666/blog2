@@ -15,19 +15,25 @@ export async function onRequestGet(context: {
   const { user } = await getSession(request, env.DB)
   if (!user) return error('未登录', 401)
 
-  // 获取发给当前用户的所有请求（incoming）和当前用户发出的请求（outgoing）
-  const [incomingResult, outgoingResult] = await Promise.all([
-    env.DB.prepare(
-      `SELECT * FROM friend_requests WHERE to_user_id = ? AND status = 'pending' ORDER BY created_at DESC`
-    ).bind(user.id),
-    env.DB.prepare(
-      `SELECT * FROM friend_requests WHERE from_user_id = ? AND status IN ('pending', 'accepted') ORDER BY created_at DESC`
-    ).bind(user.id),
-  ])
+  // 待处理的 incoming 请求（别人发给我的）
+  const incomingResult = await env.DB.prepare(
+    `SELECT * FROM friend_requests WHERE to_user_id = ? AND status = 'pending' ORDER BY created_at DESC`
+  ).bind(user.id)
+
+  // 待处理的 outgoing 请求（我发给别人的）
+  const pendingOutgoingResult = await env.DB.prepare(
+    `SELECT * FROM friend_requests WHERE from_user_id = ? AND status = 'pending' ORDER BY created_at DESC`
+  ).bind(user.id)
+
+  // 已接受的好友关系（双方均为 accepted）
+  const friendsResult = await env.DB.prepare(
+    `SELECT * FROM friend_requests WHERE ((from_user_id = ? OR to_user_id = ?) AND status = 'accepted') ORDER BY created_at DESC`
+  ).bind(user.id, user.id)
 
   return json({
     incoming: (incomingResult.results ?? []) as Array<Record<string, unknown>>,
-    outgoing: (outgoingResult.results ?? []) as Array<Record<string, unknown>>,
+    outgoing: (pendingOutgoingResult.results ?? []) as Array<Record<string, unknown>>,
+    friends: (friendsResult.results ?? []) as Array<Record<string, unknown>>,
   })
 }
 

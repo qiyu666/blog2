@@ -14,13 +14,11 @@ import SEO from '../components/SEO'
 
 // 从 friend_requests 中提取好友列表（status=accepted 的记录）
 function extractFriends(
-  incoming: FriendRequest[],
-  outgoing: FriendRequest[],
+  friends: FriendRequest[],
   currentUserId: number
 ): Array<{ userId: number; username: string; avatar: string | null; requestId: number }> {
   const map = new Map<number, { userId: number; username: string; avatar: string | null; requestId: number }>()
-  for (const r of [...incoming, ...outgoing]) {
-    if (r.status !== 'accepted') continue
+  for (const r of friends) {
     const friendId = Number(r.from_user_id) === currentUserId ? r.to_user_id : r.from_user_id
     const friendUsername = Number(r.from_user_id) === currentUserId ? r.to_username : r.from_username
     const friendAvatar = Number(r.from_user_id) === currentUserId ? r.to_avatar : r.from_avatar
@@ -62,7 +60,7 @@ export default function Mailbox() {
     if (!user) return
     try {
       const data = await getFriendRequests()
-      const friendList = extractFriends(data.incoming, data.outgoing, user.id)
+      const friendList = extractFriends(data.friends, user.id)
       setFriends(friendList)
 
       // 为每个好友计算未读消息数

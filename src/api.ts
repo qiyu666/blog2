@@ -1158,6 +1158,7 @@ export async function postCheckin(postId: number): Promise<boolean> {
 export interface FriendRequestsData {
   incoming: FriendRequest[]
   outgoing: FriendRequest[]
+  friends: FriendRequest[]
 }
 
 export async function getFriendRequests(): Promise<FriendRequestsData> {

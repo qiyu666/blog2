@@ -28,8 +28,7 @@ export default function Friends() {
       const data = await getFriendRequests()
       setIncoming(data.incoming)
       setOutgoing(data.outgoing)
-      // accepted 的请求中，当前用户是 to_user_id 的视为好友
-      setFriends(data.outgoing.filter((r) => r.status === 'accepted'))
+      setFriends(data.friends)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.failed'))
     } finally {

@@ -71,15 +71,26 @@ export default function UserProfile() {
   useEffect(() => {
     if (!username || !profile || !currentUser) return
     getFriendRequests().then((res) => {
-      const all = [...res.incoming, ...res.outgoing]
-      const req = all.find(
-        (r) => r.status !== 'rejected' && r.status !== 'cancelled' &&
+      // 检查是否已是好友
+      const acceptedReq = res.friends.find(
+        (r) => ((Number(r.from_user_id) === currentUser.id && Number(r.to_user_id) === profile.user.id) ||
+                (Number(r.from_user_id) === profile.user.id && Number(r.to_user_id) === currentUser.id))
+      )
+      if (acceptedReq?.status === 'accepted') {
+        setFriendStatus('accepted')
+        return
+      }
+      // 检查是否有 pending 请求
+      const pendingReq = [...res.incoming, ...res.outgoing].find(
+        (r) => r.status === 'pending' &&
           ((Number(r.from_user_id) === currentUser.id && Number(r.to_user_id) === profile.user.id) ||
            (Number(r.from_user_id) === profile.user.id && Number(r.to_user_id) === currentUser.id))
       )
-      if (req?.status === 'accepted') setFriendStatus('accepted')
-      else if (req?.status === 'pending' && Number(req.from_user_id) === currentUser.id) setFriendStatus('pending')
-      else setFriendStatus('none')
+      if (pendingReq?.status === 'pending' && Number(pendingReq.from_user_id) === currentUser.id) {
+        setFriendStatus('pending')
+      } else {
+        setFriendStatus('none')
+      }
     }).catch((err) => {
       console.error('loadFriendStatus error:', err)
       setFriendStatus('none')
