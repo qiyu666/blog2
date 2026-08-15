@@ -68,9 +68,28 @@ export default function UserProfile() {
       })
   }, [username])
 
+  const profileRef = useRef(profile)
+  profileRef.current = profile
+  const currentUserRef = useRef(currentUser)
+  currentUserRef.current = currentUser
+
   useEffect(() => {
-    if (!profile || !currentUser) return
-    loadFriendStatus()
+    if (!profileRef.current || !currentUserRef.current) return
+    const data = getFriendRequests()
+    data.then((res) => {
+      const all = [...res.incoming, ...res.outgoing]
+      const req = all.find(
+        (r) => r.status !== 'rejected' && r.status !== 'cancelled' &&
+          ((Number(r.from_user_id) === currentUserRef.current!.id && Number(r.to_user_id) === profileRef.current!.user.id) ||
+           (Number(r.from_user_id) === profileRef.current!.user.id && Number(r.to_user_id) === currentUserRef.current!.id))
+      )
+      if (req?.status === 'accepted') setFriendStatus('accepted')
+      else if (req?.status === 'pending' && Number(req.from_user_id) === currentUserRef.current!.id) setFriendStatus('pending')
+      else setFriendStatus('none')
+    }).catch((err) => {
+      console.error('loadFriendStatus error:', err)
+      setFriendStatus('none')
+    })
   }, [profile, currentUser])
 
   useEffect(() => {
@@ -120,24 +139,6 @@ export default function UserProfile() {
       alert(err instanceof Error ? err.message : '操作失败')
     } finally {
       setFollowLoading(false)
-    }
-  }
-
-  async function loadFriendStatus() {
-    if (!profile || !currentUser) return
-    try {
-      const data = await getFriendRequests()
-      const all = [...data.incoming, ...data.outgoing]
-      const req = all.find(
-        (r) => r.status !== 'rejected' && r.status !== 'cancelled' &&
-          ((Number(r.from_user_id) === currentUser.id && Number(r.to_user_id) === profile.user.id) ||
-           (Number(r.from_user_id) === profile.user.id && Number(r.to_user_id) === currentUser.id))
-      )
-      if (req?.status === 'accepted') setFriendStatus('accepted')
-      else if (req?.status === 'pending' && Number(req.from_user_id) === currentUser.id) setFriendStatus('pending')
-      else setFriendStatus('none')
-    } catch {
-      setFriendStatus('none')
     }
   }
 
