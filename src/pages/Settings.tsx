@@ -874,65 +874,67 @@ export default function Settings() {
             </div>
           </div>
           <div className="settings-tipping">
-            <div className="settings-tipping__field">
-              <label className="settings-tipping__label">
-                <WeChatBrandIcon /> 微信收款二维码
-              </label>
-              <div
-                className={`tipping-upload ${tippingWechatDrag ? 'tipping-upload--drag' : ''}`}
-                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setTippingWechatDrag(true) }}
-                onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setTippingWechatDrag(false) }}
-                onDrop={handleTippingWechatDrop}
-                onClick={() => tippingWechatFileRef.current?.click()}
-              >
-                {tippingWechatQr ? (
-                  <img src={tippingWechatQr} alt="微信收款二维码" className="tipping-upload__preview" />
-                ) : (
-                  <>
-                    <span className="tipping-upload__placeholder-icon">+</span>
-                    <span className="tipping-upload__text">{tippingWechatUploading ? '上传中…' : '点击或拖拽上传'}</span>
-                  </>
-                )}
-                <input ref={tippingWechatFileRef} type="file" accept="image/*" className="tipping-upload__input" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadTippingFile(f, setTippingWechatQr, setTippingWechatUploading); e.target.value = '' }} />
+            <div className="settings-tipping__row">
+              <div className="settings-tipping__field">
+                <label className="settings-tipping__label">
+                  <WeChatBrandIcon /> 微信收款二维码
+                </label>
+                <div
+                  className={`tipping-upload ${tippingWechatDrag ? 'tipping-upload--drag' : ''}`}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setTippingWechatDrag(true) }}
+                  onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setTippingWechatDrag(false) }}
+                  onDrop={handleTippingWechatDrop}
+                  onClick={() => tippingWechatFileRef.current?.click()}
+                >
+                  {tippingWechatQr ? (
+                    <img src={tippingWechatQr} alt="微信收款二维码" className="tipping-upload__preview" />
+                  ) : (
+                    <>
+                      <span className="tipping-upload__placeholder-icon">+</span>
+                      <span className="tipping-upload__text">{tippingWechatUploading ? '上传中…' : '点击或拖拽上传'}</span>
+                    </>
+                  )}
+                  <input ref={tippingWechatFileRef} type="file" accept="image/*" className="tipping-upload__input" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadTippingFile(f, setTippingWechatQr, setTippingWechatUploading); e.target.value = '' }} />
+                </div>
+                <input
+                  className="form__input form__input--url"
+                  type="text"
+                  value={tippingWechatQr}
+                  onChange={(e) => setTippingWechatQr(e.target.value)}
+                  placeholder="https://example.com/wechat-qr.png"
+                  maxLength={1000}
+                />
               </div>
-              <input
-                className="form__input form__input--url"
-                type="text"
-                value={tippingWechatQr}
-                onChange={(e) => setTippingWechatQr(e.target.value)}
-                placeholder="https://example.com/wechat-qr.png"
-                maxLength={1000}
-              />
-            </div>
-            <div className="settings-tipping__field">
-              <label className="settings-tipping__label">
-                <AlipayBrandIcon /> 支付宝收款二维码
-              </label>
-              <div
-                className={`tipping-upload ${tippingAlipayDrag ? 'tipping-upload--drag' : ''}`}
-                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setTippingAlipayDrag(true) }}
-                onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setTippingAlipayDrag(false) }}
-                onDrop={handleTippingAlipayDrop}
-                onClick={() => tippingAlipayFileRef.current?.click()}
-              >
-                {tippingAlipayQr ? (
-                  <img src={tippingAlipayQr} alt="支付宝收款二维码" className="tipping-upload__preview" />
-                ) : (
-                  <>
-                    <span className="tipping-upload__placeholder-icon">+</span>
-                    <span className="tipping-upload__text">{tippingAlipayUploading ? '上传中…' : '点击或拖拽上传'}</span>
-                  </>
-                )}
-                <input ref={tippingAlipayFileRef} type="file" accept="image/*" className="tipping-upload__input" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadTippingFile(f, setTippingAlipayQr, setTippingAlipayUploading); e.target.value = '' }} />
+              <div className="settings-tipping__field">
+                <label className="settings-tipping__label">
+                  <AlipayBrandIcon /> 支付宝收款二维码
+                </label>
+                <div
+                  className={`tipping-upload ${tippingAlipayDrag ? 'tipping-upload--drag' : ''}`}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setTippingAlipayDrag(true) }}
+                  onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setTippingAlipayDrag(false) }}
+                  onDrop={handleTippingAlipayDrop}
+                  onClick={() => tippingAlipayFileRef.current?.click()}
+                >
+                  {tippingAlipayQr ? (
+                    <img src={tippingAlipayQr} alt="支付宝收款二维码" className="tipping-upload__preview" />
+                  ) : (
+                    <>
+                      <span className="tipping-upload__placeholder-icon">+</span>
+                      <span className="tipping-upload__text">{tippingAlipayUploading ? '上传中…' : '点击或拖拽上传'}</span>
+                    </>
+                  )}
+                  <input ref={tippingAlipayFileRef} type="file" accept="image/*" className="tipping-upload__input" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadTippingFile(f, setTippingAlipayQr, setTippingAlipayUploading); e.target.value = '' }} />
+                </div>
+                <input
+                  className="form__input form__input--url"
+                  type="text"
+                  value={tippingAlipayQr}
+                  onChange={(e) => setTippingAlipayQr(e.target.value)}
+                  placeholder="https://example.com/alipay-qr.png"
+                  maxLength={1000}
+                />
               </div>
-              <input
-                className="form__input form__input--url"
-                type="text"
-                value={tippingAlipayQr}
-                onChange={(e) => setTippingAlipayQr(e.target.value)}
-                placeholder="https://example.com/alipay-qr.png"
-                maxLength={1000}
-              />
             </div>
           </div>
         </div>
