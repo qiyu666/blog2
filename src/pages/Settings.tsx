@@ -27,6 +27,8 @@ export default function Settings() {
   const [tippingAlipayQr, setTippingAlipayQr] = useState('')
   const [tippingWechatUploading, setTippingWechatUploading] = useState(false)
   const [tippingAlipayUploading, setTippingAlipayUploading] = useState(false)
+  const [tippingWechatError, setTippingWechatError] = useState('')
+  const [tippingAlipayError, setTippingAlipayError] = useState('')
   const tippingWechatFileRef = useRef<HTMLInputElement | null>(null)
   const tippingAlipayFileRef = useRef<HTMLInputElement | null>(null)
   const [tippingWechatDrag, setTippingWechatDrag] = useState(false)
@@ -276,9 +278,15 @@ export default function Settings() {
     }
   }
 
-  async function uploadTippingFile(file: File, setUrl: React.Dispatch<React.SetStateAction<string>>, setUploading: React.Dispatch<React.SetStateAction<boolean>>) {
+  async function uploadTippingFile(
+    file: File,
+    setUrl: React.Dispatch<React.SetStateAction<string>>,
+    setUploading: React.Dispatch<React.SetStateAction<boolean>>,
+    setError: React.Dispatch<React.SetStateAction<string>>,
+  ) {
     if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) return
     setUploading(true)
+    setError('')
     try {
       const base64 = await compressImage(file, 512)
       const res = await fetch('/api/upload-avatar', {
@@ -286,10 +294,15 @@ export default function Settings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: base64 }),
       })
-      if (!res.ok) throw new Error('上传失败')
-      const data = await res.json() as { data?: { link?: string } }
-      const url = data?.data?.link
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null) as { error?: string } | null
+        throw new Error(errData?.error || '上传失败，请稍后重试')
+      }
+      const data = await res.json() as { url?: string }
+      const url = data?.url
       if (url) setUrl(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '上传失败')
     } finally {
       setUploading(false)
     }
@@ -301,7 +314,7 @@ export default function Settings() {
     setTippingWechatDrag(false)
     if (tippingWechatUploading) return
     const file = e.dataTransfer.files?.[0]
-    if (file) void uploadTippingFile(file, setTippingWechatQr, setTippingWechatUploading)
+    if (file) void uploadTippingFile(file, setTippingWechatQr, setTippingWechatUploading, setTippingWechatError)
   }
 
   function handleTippingAlipayDrop(e: React.DragEvent<HTMLDivElement>) {
@@ -310,7 +323,7 @@ export default function Settings() {
     setTippingAlipayDrag(false)
     if (tippingAlipayUploading) return
     const file = e.dataTransfer.files?.[0]
-    if (file) void uploadTippingFile(file, setTippingAlipayQr, setTippingAlipayUploading)
+    if (file) void uploadTippingFile(file, setTippingAlipayQr, setTippingAlipayUploading, setTippingAlipayError)
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -887,14 +900,15 @@ export default function Settings() {
                   onClick={() => tippingWechatFileRef.current?.click()}
                 >
                   {tippingWechatQr ? (
-                    <img src={tippingWechatQr} alt="微信收款二维码" className="tipping-upload__preview" />
-                  ) : (
-                    <>
-                      <span className="tipping-upload__placeholder-icon">+</span>
-                      <span className="tipping-upload__text">{tippingWechatUploading ? '上传中…' : '点击或拖拽上传'}</span>
-                    </>
-                  )}
-                  <input ref={tippingWechatFileRef} type="file" accept="image/*" className="tipping-upload__input" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadTippingFile(f, setTippingWechatQr, setTippingWechatUploading); e.target.value = '' }} />
+                  <img src={tippingWechatQr} alt="微信收款二维码" className="tipping-upload__preview" />
+                ) : (
+                  <>
+                    <span className="tipping-upload__placeholder-icon">+</span>
+                    <span className="tipping-upload__text">{tippingWechatUploading ? '上传中…' : '点击或拖拽上传'}</span>
+                  </>
+                )}
+                {tippingWechatError && <p className="tipping-upload__error">{tippingWechatError}</p>}
+                  <input ref={tippingWechatFileRef} type="file" accept="image/*" className="tipping-upload__input" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadTippingFile(f, setTippingWechatQr, setTippingWechatUploading, setTippingWechatError); e.target.value = '' }} />
                 </div>
                 <input
                   className="form__input form__input--url"
@@ -917,14 +931,15 @@ export default function Settings() {
                   onClick={() => tippingAlipayFileRef.current?.click()}
                 >
                   {tippingAlipayQr ? (
-                    <img src={tippingAlipayQr} alt="支付宝收款二维码" className="tipping-upload__preview" />
-                  ) : (
-                    <>
-                      <span className="tipping-upload__placeholder-icon">+</span>
-                      <span className="tipping-upload__text">{tippingAlipayUploading ? '上传中…' : '点击或拖拽上传'}</span>
-                    </>
-                  )}
-                  <input ref={tippingAlipayFileRef} type="file" accept="image/*" className="tipping-upload__input" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadTippingFile(f, setTippingAlipayQr, setTippingAlipayUploading); e.target.value = '' }} />
+                  <img src={tippingAlipayQr} alt="支付宝收款二维码" className="tipping-upload__preview" />
+                ) : (
+                  <>
+                    <span className="tipping-upload__placeholder-icon">+</span>
+                    <span className="tipping-upload__text">{tippingAlipayUploading ? '上传中…' : '点击或拖拽上传'}</span>
+                  </>
+                )}
+                {tippingAlipayError && <p className="tipping-upload__error">{tippingAlipayError}</p>}
+                  <input ref={tippingAlipayFileRef} type="file" accept="image/*" className="tipping-upload__input" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadTippingFile(f, setTippingAlipayQr, setTippingAlipayUploading, setTippingAlipayError); e.target.value = '' }} />
                 </div>
                 <input
                   className="form__input form__input--url"
