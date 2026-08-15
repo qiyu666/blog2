@@ -68,29 +68,23 @@ export default function UserProfile() {
       })
   }, [username])
 
-  const profileRef = useRef(profile)
-  profileRef.current = profile
-  const currentUserRef = useRef(currentUser)
-  currentUserRef.current = currentUser
-
   useEffect(() => {
-    if (!profileRef.current || !currentUserRef.current) return
-    const data = getFriendRequests()
-    data.then((res) => {
+    if (!username || !profile || !currentUser) return
+    getFriendRequests().then((res) => {
       const all = [...res.incoming, ...res.outgoing]
       const req = all.find(
         (r) => r.status !== 'rejected' && r.status !== 'cancelled' &&
-          ((Number(r.from_user_id) === currentUserRef.current!.id && Number(r.to_user_id) === profileRef.current!.user.id) ||
-           (Number(r.from_user_id) === profileRef.current!.user.id && Number(r.to_user_id) === currentUserRef.current!.id))
+          ((Number(r.from_user_id) === currentUser.id && Number(r.to_user_id) === profile.user.id) ||
+           (Number(r.from_user_id) === profile.user.id && Number(r.to_user_id) === currentUser.id))
       )
       if (req?.status === 'accepted') setFriendStatus('accepted')
-      else if (req?.status === 'pending' && Number(req.from_user_id) === currentUserRef.current!.id) setFriendStatus('pending')
+      else if (req?.status === 'pending' && Number(req.from_user_id) === currentUser.id) setFriendStatus('pending')
       else setFriendStatus('none')
     }).catch((err) => {
       console.error('loadFriendStatus error:', err)
       setFriendStatus('none')
     })
-  }, [profile, currentUser])
+  }, [username, profile, currentUser])
 
   useEffect(() => {
     const css = profile?.user.profile_css

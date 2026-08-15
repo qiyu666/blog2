@@ -187,8 +187,8 @@ export default function Friends() {
                   {friends.map((req) => {
                     const isMe = Number(req.from_user_id) === user?.id
                     const friend = isMe
-                      ? { username: req.to_username, avatar: req.to_avatar }
-                      : { username: req.from_username, avatar: req.from_avatar }
+                      ? { username: req.to_username, avatar: req.to_avatar, userId: Number(req.to_user_id) }
+                      : { username: req.from_username, avatar: req.from_avatar, userId: Number(req.from_user_id) }
                     return (
                       <div key={req.id} className="friend-card">
                         <Link to={`/u/${friend.username}`} className="friend-user">
@@ -200,7 +200,7 @@ export default function Friends() {
                           <span className="friend-name">{friend.username}</span>
                         </Link>
                         <Link
-                          to={`/mail?user=${encodeURIComponent(friend.username || '')}`}
+                          to={`/mailbox?user_id=${friend.userId}`}
                           className="btn btn-accent btn-sm"
                         >
                           {t('messages.send')}
