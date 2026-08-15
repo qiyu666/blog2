@@ -5585,6 +5585,12 @@ input, textarea, select {
   flex-wrap: wrap;
 }
 
+.mailbox__head-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
 .mailbox__tabs {
   display: flex;
   gap: var(--space-xs);
