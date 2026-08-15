@@ -16882,13 +16882,13 @@ a.profile-stat {
   padding: var(--space-lg);
 }
 .action-btn--tip {
-  color: #fb923c;
-  border-color: rgba(251, 146, 60, 0.4);
+  color: #e879a8;
+  border-color: rgba(232, 121, 168, 0.4);
 }
 .action-btn--tip:hover {
-  background: rgba(251, 146, 60, 0.1);
-  border-color: #fb923c;
-  color: #fb923c;
+  background: rgba(232, 121, 168, 0.1);
+  border-color: #e879a8;
+  color: #e879a8;
 }
 .settings-tipping {
   margin-top: var(--space-lg);

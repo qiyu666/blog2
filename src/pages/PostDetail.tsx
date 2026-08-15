@@ -1565,8 +1565,8 @@ export default function PostDetail() {
                 onClick={() => setTippingOpen(true)}
                 title="请作者喝杯奶茶"
               >
-                <span className="action-btn__icon">☕</span>
-                <span className="action-btn__count">请作者喝杯奶茶 ☕</span>
+                <span className="action-btn__icon">🧋</span>
+                <span className="action-btn__count">请作者喝杯奶茶 🧋</span>
               </button>
               <button
                 type="button"
@@ -1892,7 +1892,7 @@ export default function PostDetail() {
       <div className="tipping-dialog-overlay" onClick={() => setTippingOpen(false)}>
         <div className="tipping-dialog" onClick={(e) => e.stopPropagation()}>
           <button className="tipping-dialog__close" onClick={() => setTippingOpen(false)}>×</button>
-          <h2 className="tipping-dialog__title">请作者喝杯奶茶 ☕</h2>
+          <h2 className="tipping-dialog__title">请作者喝杯奶茶 🧋</h2>
           <p className="tipping-dialog__hint">扫码支持作者，感谢您！</p>
           <div className="tipping-dialog__qrs">
             {authorProfile?.tipping_wechat_qr && (
