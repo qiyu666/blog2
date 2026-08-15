@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { getUserProfile, toggleFollow, getUserActivity, getFriendRequests, sendFriendRequest, type UserProfile, type ActivityItem } from '../api'
+import { getUserProfile, toggleFollow, getUserActivity, type UserProfile, type ActivityItem } from '../api'
 import { useAuth } from '../auth/AuthContext'
 import SEO from '../components/SEO'
 import SocialLinksBase from '../components/SocialLinks'
@@ -24,14 +24,6 @@ export default function UserProfile() {
   const [error, setError] = useState('')
   const [followLoading, setFollowLoading] = useState(false)
   const [isFollowing, setIsFollowing] = useState(false)
-  const [friendStatus, setFriendStatus] = useState<'none' | 'pending' | 'accepted'>('none')
-  const [friendLoading, setFriendLoading] = useState(false)
-  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
-  useEffect(() => {
-    if (!toast) return
-    const timer = setTimeout(() => setToast(null), 3000)
-    return () => clearTimeout(timer)
-  }, [toast])
   const styleRef = useRef<HTMLStyleElement | null>(null)
   const [activeCategory, setActiveCategory] = useState('全部')
   const [visibleCount, setVisibleCount] = useState(10)
@@ -67,35 +59,6 @@ export default function UserProfile() {
         setLoading(false)
       })
   }, [username])
-
-  useEffect(() => {
-    if (!username || !profile || !currentUser) return
-    getFriendRequests().then((res) => {
-      // 检查是否已是好友
-      const acceptedReq = res.friends.find(
-        (r) => ((Number(r.from_user_id) === currentUser.id && Number(r.to_user_id) === profile.user.id) ||
-                (Number(r.from_user_id) === profile.user.id && Number(r.to_user_id) === currentUser.id))
-      )
-      if (acceptedReq?.status === 'accepted') {
-        setFriendStatus('accepted')
-        return
-      }
-      // 检查是否有 pending 请求
-      const pendingReq = [...res.incoming, ...res.outgoing].find(
-        (r) => r.status === 'pending' &&
-          ((Number(r.from_user_id) === currentUser.id && Number(r.to_user_id) === profile.user.id) ||
-           (Number(r.from_user_id) === profile.user.id && Number(r.to_user_id) === currentUser.id))
-      )
-      if (pendingReq?.status === 'pending' && Number(pendingReq.from_user_id) === currentUser.id) {
-        setFriendStatus('pending')
-      } else {
-        setFriendStatus('none')
-      }
-    }).catch((err) => {
-      console.error('loadFriendStatus error:', err)
-      setFriendStatus('none')
-    })
-  }, [username, profile, currentUser])
 
   useEffect(() => {
     const css = profile?.user.profile_css
@@ -144,25 +107,6 @@ export default function UserProfile() {
       alert(err instanceof Error ? err.message : '操作失败')
     } finally {
       setFollowLoading(false)
-    }
-  }
-
-  async function handleSendFriendRequest() {
-    if (!profile || !currentUser) return
-    setFriendLoading(true)
-    try {
-      const res = await sendFriendRequest(profile.user.id)
-      if (res.auto_accepted) {
-        setFriendStatus('accepted')
-        setToast({ msg: '已成为好友！', type: 'success' })
-      } else {
-        setFriendStatus('pending')
-        setToast({ msg: '已发送好友请求', type: 'success' })
-      }
-    } catch (err) {
-      setToast({ msg: err instanceof Error ? err.message : '操作失败，请稍后重试', type: 'error' })
-    } finally {
-      setFriendLoading(false)
     }
   }
 
@@ -292,22 +236,6 @@ export default function UserProfile() {
                       >
                         发站内信
                       </Link>
-                      {friendStatus === 'none' && (
-                        <button
-                          type="button"
-                          className="btn-add-friend"
-                          onClick={handleSendFriendRequest}
-                          disabled={friendLoading}
-                        >
-                          {friendLoading ? '...' : '+ 加好友'}
-                        </button>
-                      )}
-                      {friendStatus === 'pending' && (
-                        <span className="friend-status-badge">已发送好友请求</span>
-                      )}
-                      {friendStatus === 'accepted' && (
-                        <span className="friend-status-badge friend-status-badge--accepted">已为好友</span>
-                      )}
                     </>
                   )}
                 </div>
@@ -407,9 +335,6 @@ export default function UserProfile() {
         type="profile"
       />
       {sectionOrder.filter((s) => s.visible).map((s) => renderSection(s.id))}
-      {toast && (
-        <div className={`toast toast--${toast.type}`}>{toast.msg}</div>
-      )}
     </div>
   )
 }

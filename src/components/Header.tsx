@@ -276,9 +276,6 @@ export default function Header() {
                     <span className="nav__badge">{unreadCount}</span>
                   )}
                 </NavLink>
-                <NavLink to="/friends" className="mobile-menu__link">
-                  {t('nav.friends')}
-                </NavLink>
                 <NavLink to="/new" className="mobile-menu__link mobile-menu__link--accent">
                   {t('nav.newPost')}
                 </NavLink>

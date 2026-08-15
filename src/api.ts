@@ -9,7 +9,6 @@ import type {
   FollowStatus,
   NotificationItem,
   UserCategory,
-  FriendRequest,
 } from './types';
 
 export interface LoginResult {
@@ -393,21 +392,6 @@ export async function createMessage(toUserId: number, subject: string, content: 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ to_user_id: toUserId, subject, content }),
   });
-}
-
-// 标记与某用户相关的消息为已读
-export async function markMessagesAsRead(opts: { from_id?: number }): Promise<void> {
-  if (!opts.from_id) return
-  await request<void>('/api/messages/read-all', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from_id: opts.from_id }),
-  });
-}
-
-// 获取与某好友的对话历史
-export async function getMessagesByFriend(friendId: number): Promise<Message[]> {
-  return request<Message[]>(`/api/messages?from_id=${friendId}`);
 }
 
 // ===== Unread count (for header badge) =====
@@ -1154,44 +1138,5 @@ export async function postCheckin(postId: number): Promise<boolean> {
   return res.ok
 }
 
-// ===== 好友请求 =====
-export interface FriendRequestsData {
-  incoming: FriendRequest[]
-  outgoing: FriendRequest[]
-  friends: FriendRequest[]
-}
-
-export async function getFriendRequests(): Promise<FriendRequestsData> {
-  return request<FriendRequestsData>('/api/friends/requests')
-}
-
-export async function sendFriendRequest(toUserId: number): Promise<{ status: string; auto_accepted?: boolean }> {
-  return request<{ status: string; auto_accepted?: boolean }>('/api/friends/requests', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to_user_id: toUserId }),
-  })
-}
-
-export async function handleFriendRequest(requestId: number, action: 'accept' | 'reject'): Promise<{ status: string }> {
-  return request<{ status: string }>(`/api/friends/requests/${requestId}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action }),
-  })
-}
-
-export async function cancelFriendRequest(requestId: number): Promise<{ deleted: boolean }> {
-  return request<{ deleted: boolean }>(`/api/friends/requests/${requestId}`, {
-    method: 'DELETE',
-  })
-}
-
-export async function unfriend(requestId: number): Promise<{ status: string }> {
-  return request<{ status: string }>(`/api/friends/requests/${requestId}`, {
-    method: 'DELETE',
-  })
-}
-
-// Re-export types for convenience
-export type { Message, FriendRequest, FriendRequestStatus } from './types'
+// Re-export Message type for convenience
+export type { Message } from './types'

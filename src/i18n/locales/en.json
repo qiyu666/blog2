@@ -13,7 +13,6 @@
     "drafts": "Drafts",
     "newPost": "Write",
     "mailbox": "Messages",
-    "friends": "Friends",
     "profile": "Profile",
     "forum": "Forum",
     "history": "History"
@@ -118,32 +117,6 @@
     "registerPasswordPlaceholder": "At least 8 characters",
     "confirmPasswordPlaceholder": "Enter password again",
     "mailboxHint": "Messages are used for communication between members. For external email service, visit"
-  },
-  "friends": {
-    "title": "Friends",
-    "description": "Manage your friendships and friend requests",
-    "requests_received": "Friend Requests",
-    "requests_sent": "Sent Requests",
-    "my_friends": "My Friends",
-    "no_requests": "No friend requests",
-    "no_pending": "No pending requests",
-    "no_friends": "No friends yet. Go find some interesting people!",
-    "accept": "Accept",
-    "reject": "Reject",
-    "cancel": "Cancel",
-    "unfriend": "Unfriend",
-    "go_manage": "Manage friends"
-  },
-  "messages": {
-    "friends": "Friends",
-    "select_friend": "Select a friend to start chatting",
-    "typing_hint": "Online",
-    "send": "Send",
-    "sending": "Sending…",
-    "subject_placeholder": "Subject (optional)",
-    "placeholder": "Type a message…",
-    "no_subject": "No Subject",
-    "login_required": "Please log in to view messages"
   },
   "notFound": {
     "title": "Page Not Found",
