@@ -16882,15 +16882,6 @@ a.profile-stat {
   font-size: 0.9rem;
   padding: var(--space-lg);
 }
-.action-btn--tip {
-  color: #e879a8;
-  border-color: rgba(232, 121, 168, 0.4);
-}
-.action-btn--tip:hover {
-  background: rgba(232, 121, 168, 0.1);
-  border-color: #e879a8;
-  color: #e879a8;
-}
 .settings-tipping {
   margin-top: var(--space-lg);
   padding-top: var(--space-lg);
