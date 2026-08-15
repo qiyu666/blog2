@@ -102,6 +102,21 @@ export interface Message {
   to_avatar?: string;
 }
 
+export type FriendRequestStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled';
+
+export interface FriendRequest {
+  id: number;
+  from_user_id: number;
+  to_user_id: number;
+  status: FriendRequestStatus;
+  created_at: string;
+  responded_at?: string | null;
+  from_username?: string;
+  from_avatar?: string;
+  to_username?: string;
+  to_avatar?: string;
+}
+
 export interface SearchResult {
   id: number;
   title: string;

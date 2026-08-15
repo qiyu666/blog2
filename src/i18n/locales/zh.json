@@ -13,6 +13,7 @@
     "drafts": "草稿",
     "newPost": "发帖",
     "mailbox": "站内信",
+    "friends": "好友",
     "profile": "个人主页",
     "forum": "论坛",
     "history": "历史"
@@ -118,7 +119,33 @@
     "confirmPasswordPlaceholder": "再次输入密码",
     "mailboxHint": "站内信用于站内成员之间的通信。如需站外邮箱服务，请访问"
   },
-  "notFound": {
+  "friends": {
+    "title": "好友",
+    "description": "管理你的好友关系和好友请求",
+    "requests_received": "收到的好友请求",
+    "requests_sent": "已发送的请求",
+    "my_friends": "我的好友",
+    "no_requests": "暂无好友请求",
+    "no_pending": "暂无待处理请求",
+    "no_friends": "还没有好友，去发现有趣的人吧",
+    "accept": "接受",
+    "reject": "拒绝",
+    "cancel": "取消",
+    "unfriend": "解除好友",
+    "go_manage": "去管理"
+  },
+  "messages": {
+    "friends": "好友列表",
+    "select_friend": "选择一位好友开始聊天",
+    "typing_hint": "在线",
+    "send": "发送",
+    "sending": "发送中…",
+    "subject_placeholder": "主题（可选）",
+    "placeholder": "输入消息…",
+    "no_subject": "无主题",
+    "login_required": "请先登录以查看站内信"
+  },
+  "common": {
     "title": "页面走丢了",
     "desc": "你访问的页面不存在，可能已被移动或删除。",
     "backHome": "返回首页",

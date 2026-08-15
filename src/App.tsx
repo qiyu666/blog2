@@ -14,6 +14,7 @@ import PageFallback from './components/PageFallback'
 const NewPost = lazy(() => import('./pages/NewPost'))
 const EditPost = lazy(() => import('./pages/EditPost'))
 const Mailbox = lazy(() => import('./pages/Mailbox'))
+const Friends = lazy(() => import('./pages/Friends'))
 const NewMessage = lazy(() => import('./pages/NewMessage'))
 const MessageDetail = lazy(() => import('./pages/MessageDetail'))
 const Favorites = lazy(() => import('./pages/Favorites'))
@@ -87,6 +88,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Mailbox />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/friends"
+            element={
+              <ProtectedRoute>
+                <Friends />
               </ProtectedRoute>
             }
           />
