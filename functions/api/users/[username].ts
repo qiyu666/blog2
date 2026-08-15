@@ -265,6 +265,25 @@ export async function onRequestPatch(context: {
       }
     }
 
+    // 打赏二维码字段（v20 添加，检查一次即可）
+    const tippingFields: Array<[string, string | undefined]> = [
+      ['tipping_wechat_qr', body.tipping_wechat_qr],
+      ['tipping_alipay_qr', body.tipping_alipay_qr],
+    ]
+    const tippingProvided = tippingFields.filter(([, v]) => v !== undefined)
+    let tippingSkipped = false
+    if (tippingProvided.length > 0) {
+      try {
+        await env.DB.prepare('SELECT tipping_wechat_qr FROM users WHERE id = ?').bind(user.id).first()
+        for (const [col, val] of tippingProvided) {
+          updates.push(`${col} = ?`)
+          paramsArr.push(cleanText(val || '', 1000).trim())
+        }
+      } catch {
+        tippingSkipped = true
+      }
+    }
+
     if (updates.length === 0) {
       return json({ success: true, message: '没有需要更新的字段' })
     }
