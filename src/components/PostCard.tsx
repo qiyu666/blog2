@@ -63,7 +63,7 @@ export default function PostCard({ post, index = 0 }: { post: PostCardData; inde
         <span className="post-card__category">{post.category}</span>
         {readItem && (
           <span className="post-card__read-mark" title={timeAgo(readItem.visited_at)}>
-            ✓ 已读{readItem.read_progress ? ` ${readItem.read_progress}%` : ''}
+            ✓ 已读{readItem.read_progress && Number(readItem.read_progress) > 0 ? ` ${Math.round(Number(readItem.read_progress))}%` : ''}
           </span>
         )}
         <h3 className="post-card__title">

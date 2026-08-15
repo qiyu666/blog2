@@ -12,6 +12,7 @@ export default function LanguageSwitcher() {
     i18n.changeLanguage(lang)
     localStorage.setItem('blog-lang', lang)
     setOpen(false)
+    window.location.reload()
   }
 
   useEffect(() => {
