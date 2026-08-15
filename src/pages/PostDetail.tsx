@@ -145,6 +145,8 @@ export default function PostDetail() {
     social_telegram?: string
     social_bilibili?: string
     social_email?: string
+    tipping_wechat_qr?: string
+    tipping_alipay_qr?: string
   } | null>(null)
 
   const [mentionQuery, setMentionQuery] = useState('')
@@ -203,6 +205,9 @@ export default function PostDetail() {
   const [shareBusy, setShareBusy] = useState(false)
   const [shareError, setShareError] = useState('')
   const [shareCopied, setShareCopied] = useState(false)
+
+  // 打赏弹窗
+  const [tippingOpen, setTippingOpen] = useState(false)
 
   // 密码保护
   const [passwordUnlocked, setPasswordUnlocked] = useState(false)
@@ -1556,6 +1561,15 @@ export default function PostDetail() {
               </button>
               <button
                 type="button"
+                className="action-btn action-btn--tip"
+                onClick={() => setTippingOpen(true)}
+                title="请作者喝杯奶茶"
+              >
+                <span className="action-btn__icon">☕</span>
+                <span className="action-btn__count">请作者喝杯奶茶 ☕</span>
+              </button>
+              <button
+                type="button"
                 className="action-btn action-btn--report"
                 onClick={handleReport}
                 disabled={reportBusy}
@@ -1874,6 +1888,32 @@ export default function PostDetail() {
       onClose={() => setLightboxOpen(false)}
       onIndexChange={setLightboxIndex}
     />
+    {tippingOpen && (
+      <div className="tipping-dialog-overlay" onClick={() => setTippingOpen(false)}>
+        <div className="tipping-dialog" onClick={(e) => e.stopPropagation()}>
+          <button className="tipping-dialog__close" onClick={() => setTippingOpen(false)}>×</button>
+          <h2 className="tipping-dialog__title">请作者喝杯奶茶 ☕</h2>
+          <p className="tipping-dialog__hint">扫码支持作者，感谢您！</p>
+          <div className="tipping-dialog__qrs">
+            {authorProfile?.tipping_wechat_qr && (
+              <div className="tipping-dialog__qr">
+                <img src={authorProfile.tipping_wechat_qr} alt="微信打赏" className="tipping-dialog__qr-img" />
+                <span className="tipping-dialog__qr-label">微信打赏</span>
+              </div>
+            )}
+            {authorProfile?.tipping_alipay_qr && (
+              <div className="tipping-dialog__qr">
+                <img src={authorProfile.tipping_alipay_qr} alt="支付宝打赏" className="tipping-dialog__qr-img" />
+                <span className="tipping-dialog__qr-label">支付宝打赏</span>
+              </div>
+            )}
+            {!authorProfile?.tipping_wechat_qr && !authorProfile?.tipping_alipay_qr && (
+              <p className="tipping-dialog__empty">作者暂未设置打赏方式</p>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
     </>
   )
 }

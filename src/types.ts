@@ -55,6 +55,8 @@ export interface User {
   social_twitter?: string;
   social_qq?: string;
   social_wechat?: string;
+  tipping_wechat_qr?: string;
+  tipping_alipay_qr?: string;
   social_telegram?: string;
   social_bilibili?: string;
   social_email?: string;

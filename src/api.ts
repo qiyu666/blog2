@@ -593,6 +593,8 @@ export interface ProfileUpdate {
   social_email?: string;
   social_facebook?: string;
   social_whatsapp?: string;
+  tipping_wechat_qr?: string;
+  tipping_alipay_qr?: string;
 }
 
 export async function getUserProfile(username: string): Promise<UserProfile> {

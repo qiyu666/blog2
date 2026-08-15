@@ -16797,5 +16797,108 @@ a.profile-stat {
 }
 
 /* ========================================
+   打赏弹窗样式
+   ======================================== */
+.tipping-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: var(--space-md);
+}
+.tipping-dialog {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
+  max-width: 420px;
+  width: 100%;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.tipping-dialog__close {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  background: none;
+  border: none;
+  color: var(--ink-muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  transition: color var(--ease);
+}
+.tipping-dialog__close:hover {
+  color: var(--ink);
+}
+.tipping-dialog__title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 var(--space-sm);
+  text-align: center;
+}
+.tipping-dialog__hint {
+  font-size: 0.88rem;
+  color: var(--ink-muted);
+  text-align: center;
+  margin: 0 0 var(--space-lg);
+}
+.tipping-dialog__qrs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-lg);
+}
+.tipping-dialog__qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.tipping-dialog__qr-img {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  padding: 4px;
+}
+.tipping-dialog__qr-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.tipping-dialog__empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+  padding: var(--space-lg);
+}
+.action-btn--tip {
+  color: #fb923c;
+  border-color: rgba(251, 146, 60, 0.4);
+}
+.action-btn--tip:hover {
+  background: rgba(251, 146, 60, 0.1);
+  border-color: #fb923c;
+  color: #fb923c;
+}
+.settings-tipping {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--line);
+}
+.settings-tipping__field {
+  margin-bottom: var(--space-md);
+}
+
+/* ========================================
    好友系统样式
    ======================================== */

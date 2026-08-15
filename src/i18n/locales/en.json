@@ -20,7 +20,14 @@
   "mailbox": {
     "newMessage": "New message"
   },
-  "home": {
+  "post": {
+    "tipAuthor": "Buy Author a Milk Tea ☕",
+    "tipClose": "Close",
+    "wechatTip": "WeChat Tip",
+    "alipayTip": "Alipay Tip",
+    "noTip": "Author hasn't set up tipping yet"
+  },
+  "notFound": {
     "heroTitle": "Let ideas",
     "heroTitleGradient": "slowly meet",
     "heroSubtitle": "Field notes on reading, writing, attention and design. Published occasionally, read slowly — ",
@@ -81,7 +88,12 @@
     "loginToComment": " to join the discussion.",
     "loginToLike": "Login to like",
     "loginToFavorite": "Login to favorite",
-    "noComments": "No comments yet. Be the first to comment."
+    "noComments": "No comments yet. Be the first to comment.",
+    "tipAuthor": "Buy Author a Milk Tea ☕",
+    "tipClose": "Close",
+    "wechatTip": "WeChat Tip",
+    "alipayTip": "Alipay Tip",
+    "noTip": "Author hasn't set up tipping yet"
   },
   "auth": {
     "loginTitle": "Welcome back",

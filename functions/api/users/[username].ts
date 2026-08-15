@@ -22,7 +22,8 @@ export async function onRequestGet(context: {
           `SELECT id, username, display_name, role, avatar, bio, location, website,
             profile_css, profile_bg, profile_layout, created_at,
             social_github, social_twitter, social_qq, social_wechat,
-            social_telegram, social_bilibili, social_email, social_facebook, social_whatsapp
+            social_telegram, social_bilibili, social_email, social_facebook, social_whatsapp,
+            tipping_wechat_qr, tipping_alipay_qr
            FROM users WHERE username = ?`
         )
         .bind(username)
@@ -182,6 +183,8 @@ export async function onRequestPatch(context: {
     social_email?: string
     social_facebook?: string
     social_whatsapp?: string
+    tipping_wechat_qr?: string
+    tipping_alipay_qr?: string
   }
   try {
     body = await request.json()
@@ -318,9 +321,11 @@ export async function onRequestPatch(context: {
     return json({
       user: updated,
       success: true,
-      warning: socialSkipped
-        ? '社交资料未保存：数据库未执行 schema-v9.sql 迁移，请先运行 npx wrangler d1 execute blog-db --remote --file=./schema-v9.sql'
-        : undefined,
+      warning: tippingSkipped
+        ? '打赏二维码未保存：数据库未执行 schema-v20.sql 迁移，请先运行 npx wrangler d1 execute blog-db --remote --file=./schema-v20.sql'
+        : socialSkipped
+          ? '社交资料未保存：数据库未执行 schema-v9.sql 迁移，请先运行 npx wrangler d1 execute blog-db --remote --file=./schema-v9.sql'
+          : undefined,
     })
   } catch (err) {
     return error('更新失败：' + String(err), 500)

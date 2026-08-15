@@ -23,6 +23,8 @@ export default function Settings() {
   const [socialEmail, setSocialEmail] = useState('')
   const [socialFacebook, setSocialFacebook] = useState('')
   const [socialWhatsapp, setSocialWhatsapp] = useState('')
+  const [tippingWechatQr, setTippingWechatQr] = useState('')
+  const [tippingAlipayQr, setTippingAlipayQr] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -293,6 +295,8 @@ export default function Settings() {
       social_email: socialEmail,
       social_facebook: socialFacebook,
       social_whatsapp: socialWhatsapp,
+      tipping_wechat_qr: tippingWechatQr,
+      tipping_alipay_qr: tippingAlipayQr,
     }
 
     try {
@@ -823,6 +827,34 @@ export default function Settings() {
                 onChange={(e) => setSocialWhatsapp(e.target.value)}
                 placeholder="+86 13800138000"
                 maxLength={50}
+              />
+            </div>
+          </div>
+          <div className="settings-tipping">
+            <div className="settings-tipping__field">
+              <label className="settings-tipping__label">
+                💳 微信收款二维码图片 URL
+              </label>
+              <input
+                className="form__input"
+                type="text"
+                value={tippingWechatQr}
+                onChange={(e) => setTippingWechatQr(e.target.value)}
+                placeholder="https://example.com/wechat-qr.png"
+                maxLength={1000}
+              />
+            </div>
+            <div className="settings-tipping__field">
+              <label className="settings-tipping__label">
+                💳 支付宝收款二维码图片 URL
+              </label>
+              <input
+                className="form__input"
+                type="text"
+                value={tippingAlipayQr}
+                onChange={(e) => setTippingAlipayQr(e.target.value)}
+                placeholder="https://example.com/alipay-qr.png"
+                maxLength={1000}
               />
             </div>
           </div>
