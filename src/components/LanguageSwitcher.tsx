@@ -10,7 +10,11 @@ export default function LanguageSwitcher() {
 
   function changeLang(lang: string) {
     i18n.changeLanguage(lang)
-    localStorage.setItem('blog-lang', lang)
+    if (lang === 'zh') {
+      localStorage.removeItem('blog-lang')
+    } else {
+      localStorage.setItem('blog-lang', lang)
+    }
     setOpen(false)
     window.location.reload()
   }

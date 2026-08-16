@@ -3,7 +3,8 @@ import { initReactI18next } from 'react-i18next'
 import zh from './locales/zh.json'
 import en from './locales/en.json'
 
-const savedLang = localStorage.getItem('blog-lang') || 'zh'
+const rawLang = localStorage.getItem('blog-lang')
+const savedLang = (rawLang === 'zh' || rawLang === 'en') ? rawLang : 'zh'
 
 i18n.use(initReactI18next).init({
   resources: {
