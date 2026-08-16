@@ -1686,6 +1686,17 @@ input, textarea, select {
   transform: scale(1.1);
 }
 
+.post-card__read-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  color: var(--success, #22c55e);
+  font-weight: 500;
+  margin-bottom: var(--space-2);
+  opacity: 0.85;
+}
+
 .post-card__category {
   font-size: var(--fs-xs);
   font-weight: 600;
