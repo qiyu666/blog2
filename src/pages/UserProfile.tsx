@@ -24,6 +24,7 @@ export default function UserProfile() {
   const [error, setError] = useState('')
   const [followLoading, setFollowLoading] = useState(false)
   const [isFollowing, setIsFollowing] = useState(false)
+  const [tippingOpen, setTippingOpen] = useState(false)
   const styleRef = useRef<HTMLStyleElement | null>(null)
   const [activeCategory, setActiveCategory] = useState('全部')
   const [visibleCount, setVisibleCount] = useState(10)
@@ -335,6 +336,32 @@ export default function UserProfile() {
         type="profile"
       />
       {sectionOrder.filter((s) => s.visible).map((s) => renderSection(s.id))}
+      {tippingOpen && (
+        <div className="tipping-dialog-overlay" onClick={() => setTippingOpen(false)}>
+          <div className="tipping-dialog" onClick={(e) => e.stopPropagation()}>
+            <button className="tipping-dialog__close" onClick={() => setTippingOpen(false)}>×</button>
+            <h2 className="tipping-dialog__title">请作者喝杯奶茶 🧋</h2>
+            <p className="tipping-dialog__hint">扫码支持作者，感谢您！</p>
+            <div className="tipping-dialog__qrs">
+              {user.tipping_wechat_qr && (
+                <div className="tipping-dialog__qr">
+                  <img src={user.tipping_wechat_qr} alt="微信打赏" className="tipping-dialog__qr-img" />
+                  <span className="tipping-dialog__qr-label">微信打赏</span>
+                </div>
+              )}
+              {user.tipping_alipay_qr && (
+                <div className="tipping-dialog__qr">
+                  <img src={user.tipping_alipay_qr} alt="支付宝打赏" className="tipping-dialog__qr-img" />
+                  <span className="tipping-dialog__qr-label">支付宝打赏</span>
+                </div>
+              )}
+              {!user.tipping_wechat_qr && !user.tipping_alipay_qr && (
+                <p className="tipping-dialog__empty">作者暂未设置打赏方式</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -665,6 +692,8 @@ interface SocialLinksProps {
     social_email?: string
     social_facebook?: string
     social_whatsapp?: string
+    tipping_wechat_qr?: string
+    tipping_alipay_qr?: string
   }
   isOwn?: boolean
 }
