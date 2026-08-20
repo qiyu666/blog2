@@ -125,24 +125,26 @@ function renderMarkdownRaw(text: string, opts?: RenderOptions): string {
   const lines = text.split('\n')
   const processed = opts?.allowMath ? processBlockMath(lines) : lines
 
-  // Phase 1: 提取代码块，将内容替换为占位符
+  // Phase 1: 提取代码块，将内容替换为占位符（允许最多 3 格缩进）
   const placeholders: string[] = []
   let idx = 0
   const tokens: string[] = []
   let inCodeBlock = false
   let codeBuffer = ''
   let codeLang = ''
+  const fenceRE = /^ ```/
 
   for (let i = 0; i < processed.length; i++) {
     const line = processed[i]
-    if (line.match(/^```/) && !inCodeBlock) {
+    const fenceMatch = line.match(fenceRE)
+    if (!inCodeBlock && fenceMatch) {
       inCodeBlock = true
-      codeLang = line.slice(3).trim()
+      codeLang = line.slice(fenceMatch[0].length).trim()
       codeBuffer = ''
       continue
     }
     if (inCodeBlock) {
-      if (line.match(/^```/) && codeBuffer !== '') {
+      if (fenceMatch && codeBuffer !== '') {
         inCodeBlock = false
         const placeholder = `%%PLACEHOLDER_${idx}%%`
         placeholders[idx++] = buildCodeBlockHTML(codeBuffer, codeLang, opts)
