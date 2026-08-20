@@ -49,6 +49,27 @@ function processInlineMath(text: string, opts?: RenderOptions): string {
   })
 }
 
+function processInlineMarkdown(text: string, opts?: RenderOptions): string {
+  // 1. 行内代码 `code`（优先处理，避免与其他标记冲突）
+  text = text.replace(/`([^`\n]+)`/g, (_, code: string) => {
+    return `<code>${escapeHtml(code)}</code>`
+  })
+  // 2. 链接 [text](url)
+  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => {
+    const safeHref = href.replace(/"/g, '&quot;')
+    return `<a href="${safeHref}" target="_blank" rel="noopener noreferrer">${label}</a>`
+  })
+  // 3. 加粗 **text** 或 __text__
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  text = text.replace(/__(.+?)__/g, '<strong>$1</strong>')
+  // 4. 斜体 *text* 或 _text_
+  text = text.replace(/\*(.+?)\*/g, '<em>$1</em>')
+  text = text.replace(/_(.+?)_/g, '<em>$1</em>')
+  // 5. 删除线 ~~text~~
+  text = text.replace(/~~(.+?)~~/g, '<del>$1</del>')
+  return processInlineMath(text, opts)
+}
+
 function processBlockMath(lines: string[]): string[] {
   const result: string[] = []
   let i = 0
@@ -102,7 +123,7 @@ function renderMarkdownRaw(text: string, opts?: RenderOptions): string {
   for (let i = 0; i < processed.length; i++) {
     const line = processed[i]
 
-    if (line.startsWith('```')) {
+    if (line.match(/^```/)) {
       if (!inCodeBlock) {
         inCodeBlock = true
         codeLang = line.slice(3).trim()
@@ -183,7 +204,7 @@ function renderMarkdownRaw(text: string, opts?: RenderOptions): string {
     }
 
     if (line.trim()) {
-      html += `<p>${processInlineMath(line, opts)}</p>`
+      html += `<p>${processInlineMarkdown(line, opts)}</p>`
     } else {
       html += '<br>'
     }
@@ -194,7 +215,7 @@ function renderMarkdownRaw(text: string, opts?: RenderOptions): string {
 
 export function renderMarkdown(text: string, opts?: RenderOptions): string {
   const rawHtml = renderMarkdownRaw(text, opts)
-  const inlineProcessed = processInlineMath(rawHtml, { ...opts })
+  const inlineProcessed = processInlineMarkdown(rawHtml, { ...opts })
   return DOMPurify.sanitize(inlineProcessed, { ALLOWED_TAGS: ['h1','h2','h3','h4','h5','h6','strong','em','del','u','sub','sup','a','p','br','ul','ol','li','blockquote','hr','pre','code','img','table','thead','tbody','tr','th','td','span','div','section','aside','details','summary','kbd'], ALLOWED_ATTR: ['href','src','alt','class','id','title','target','rel','style','data-lang','data-theme','width','height','checked','disabled','readonly','name','value','pattern','placeholder','min','max','step','multiple','required','open','colspan','rowspan','for','tabindex','spellcheck','translate','draggable','contenteditable','inputmode','autocapitalize','autocomplete','autofocus','maxlength','size','sandbox','frameborder','allowfullscreen','loading','decoding','fetchpriority','ping','sizes','srcset','usemap','start','reversed','type'] })
 }
 
