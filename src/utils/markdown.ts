@@ -111,13 +111,9 @@ function processBlockMath(lines: string[]): string[] {
   return result
 }
 
-function buildCodeBlockHTML(code: string, lang: string, opts?: RenderOptions): string {
-  let highlighted = code
-  if (!opts?.skipCodeHighlight && lang && Prism.languages[lang]) {
-    highlighted = Prism.highlight(code, Prism.languages[lang], lang)
-  }
+function buildCodeBlockHTML(code: string, lang: string): string {
   const langLabel = lang || 'text'
-  return `<pre class="code-block"><div class="code-block__header"><span class="code-block__lang">${escapeHtml(langLabel)}</span><button class="code-block__copy" onclick="navigator.clipboard.writeText(this.closest('.code-block').querySelector('code').textContent)">复制</button></div><code class="language-${escapeHtml(lang)}">${highlighted}</code></pre>`
+  return `<pre class="code-block"><div class="code-block__header"><span class="code-block__lang">${escapeHtml(langLabel)}</span><button class="code-block__copy" onclick="navigator.clipboard.writeText(this.closest('.code-block').querySelector('code').textContent)">复制</button></div><code class="language-${escapeHtml(lang)}">${escapeHtml(code)}</code></pre>`
 }
 
 function renderMarkdownRaw(text: string, opts?: RenderOptions): string {
@@ -147,7 +143,7 @@ function renderMarkdownRaw(text: string, opts?: RenderOptions): string {
       if (fenceMatch && codeBuffer !== '') {
         inCodeBlock = false
         const placeholder = `%%PLACEHOLDER_${idx}%%`
-        placeholders[idx++] = buildCodeBlockHTML(codeBuffer, codeLang, opts)
+        placeholders[idx++] = buildCodeBlockHTML(codeBuffer, codeLang)
         tokens.push(placeholder)
         codeBuffer = ''
         codeLang = ''
@@ -161,7 +157,7 @@ function renderMarkdownRaw(text: string, opts?: RenderOptions): string {
   // 处理末尾未闭合的代码块
   if (inCodeBlock && codeBuffer !== '') {
     const placeholder = `%%PLACEHOLDER_${idx}%%`
-    placeholders[idx++] = buildCodeBlockHTML(codeBuffer, codeLang, opts)
+    placeholders[idx++] = buildCodeBlockHTML(codeBuffer, codeLang)
     tokens.push(placeholder)
   }
 
