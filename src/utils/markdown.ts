@@ -111,103 +111,130 @@ function processBlockMath(lines: string[]): string[] {
   return result
 }
 
+function buildCodeBlockHTML(code: string, lang: string, opts?: RenderOptions): string {
+  let highlighted = code
+  if (!opts?.skipCodeHighlight && lang && Prism.languages[lang]) {
+    highlighted = Prism.highlight(code, Prism.languages[lang], lang)
+  }
+  const langLabel = lang || 'text'
+  return `<pre class="code-block"><div class="code-block__header"><span class="code-block__lang">${escapeHtml(langLabel)}</span><button class="code-block__copy" onclick="navigator.clipboard.writeText(this.closest('.code-block').querySelector('code').textContent)">复制</button></div><code class="language-${escapeHtml(lang)}">${highlighted}</code></pre>`
+}
+
 function renderMarkdownRaw(text: string, opts?: RenderOptions): string {
   if (!text) return ''
   const lines = text.split('\n')
   const processed = opts?.allowMath ? processBlockMath(lines) : lines
-  let html = ''
+
+  // Phase 1: 提取代码块，将内容替换为占位符
+  const placeholders: string[] = []
+  let idx = 0
+  const tokens: string[] = []
   let inCodeBlock = false
   let codeBuffer = ''
   let codeLang = ''
 
   for (let i = 0; i < processed.length; i++) {
     const line = processed[i]
-
-    if (line.match(/^```/)) {
-      if (!inCodeBlock) {
-        inCodeBlock = true
-        codeLang = line.slice(3).trim()
-        codeBuffer = ''
-        continue
-      } else {
+    if (line.match(/^```/) && !inCodeBlock) {
+      inCodeBlock = true
+      codeLang = line.slice(3).trim()
+      codeBuffer = ''
+      continue
+    }
+    if (inCodeBlock) {
+      if (line.match(/^```/) && codeBuffer !== '') {
         inCodeBlock = false
-        let code = codeBuffer
-        if (!opts?.skipCodeHighlight && codeLang && Prism.languages[codeLang]) {
-          code = Prism.highlight(code, Prism.languages[codeLang], codeLang)
-        }
-        const langLabel = codeLang || 'text'
-        html += `<pre class="code-block"><div class="code-block__header"><span class="code-block__lang">${escapeHtml(langLabel)}</span><button class="code-block__copy" onclick="navigator.clipboard.writeText(this.closest('.code-block').querySelector('code').textContent)">复制</button></div><code class="language-${escapeHtml(codeLang)}">${code}</code></pre>`
+        const placeholder = `%%PLACEHOLDER_${idx}%%`
+        placeholders[idx++] = buildCodeBlockHTML(codeBuffer, codeLang, opts)
+        tokens.push(placeholder)
         codeBuffer = ''
         codeLang = ''
         continue
       }
-    }
-
-    if (inCodeBlock) {
       codeBuffer += (codeBuffer ? '\n' : '') + line
+    } else {
+      tokens.push(line)
+    }
+  }
+  // 处理末尾未闭合的代码块
+  if (inCodeBlock && codeBuffer !== '') {
+    const placeholder = `%%PLACEHOLDER_${idx}%%`
+    placeholders[idx++] = buildCodeBlockHTML(codeBuffer, codeLang, opts)
+    tokens.push(placeholder)
+  }
+
+  // Phase 2: 对非代码行做行内格式化
+  let html = ''
+  let tIdx = 0
+  while (tIdx < tokens.length) {
+    const token = tokens[tIdx]
+    if (token.startsWith('%%PLACEHOLDER_')) {
+      html += token
+      tIdx++
       continue
     }
-
-    if (line.match(/^#{1,5}\s/)) {
-      const match = line.match(/^(#{1,5})\s+(.+)$/)
+    if (token.match(/^#{1,5}\s/)) {
+      const match = token.match(/^(#{1,5})\s+(.+)$/)
       if (match) {
         const level = match[1].length
-        const text = processInlineMath(match[2], opts)
-        const slug = text.replace(/[^\u4e00-\u9fa5a-zA-Z0-9\u00C0-\u024F]/g, '-').toLowerCase().replace(/-+/g, '-').slice(0, 80) || 'heading'
-        html += `<h${level} id="${slug}">${text}</h${level}>`
+        const title = processInlineMarkdown(match[2], opts)
+        const slug = title.replace(/[^\u4e00-\u9fa5a-zA-Z0-9\u00C0-\u024F]/g, '-').toLowerCase().replace(/-+/g, '-').slice(0, 80) || 'heading'
+        html += `<h${level} id="${slug}">${title}</h${level}>`
+        tIdx++
         continue
       }
     }
-
-    if (line.startsWith('- ') || line.startsWith('* ')) {
+    if (token.startsWith('- ') || token.startsWith('* ')) {
       const items: string[] = []
-      while (i < processed.length && (processed[i].startsWith('- ') || processed[i].startsWith('* '))) {
-        items.push(processInlineMath(processed[i].slice(2).trim(), opts))
-        i++
+      while (tIdx < tokens.length && (tokens[tIdx].startsWith('- ') || tokens[tIdx].startsWith('* '))) {
+        const line = tokens[tIdx++]
+        if (!line.match(/^%%PLACEHOLDER_/)) items.push(processInlineMarkdown(line.slice(2).trim(), opts))
       }
       html += '<ul>' + items.map((item) => `<li>${item}</li>`).join('') + '</ul>'
       continue
     }
-
-    if (line.match(/^\d+\.\s/)) {
+    if (token.match(/^\d+\.\s/)) {
       const items: string[] = []
-      while (i < processed.length && processed[i].match(/^\d+\.\s/)) {
-        items.push(processInlineMath(processed[i].replace(/^\d+\.\s/, ''), opts))
-        i++
+      while (tIdx < tokens.length && tokens[tIdx].match(/^\d+\.\s/)) {
+        const line = tokens[tIdx++]
+        if (!line.match(/^%%PLACEHOLDER_/)) items.push(processInlineMarkdown(line.replace(/^\d+\.\s/, ''), opts))
       }
       html += '<ol>' + items.map((item) => `<li>${item}</li>`).join('') + '</ol>'
       continue
     }
-
-    if (line.startsWith('> ')) {
+    if (token.startsWith('> ')) {
       const quoteLines: string[] = []
-      while (i < processed.length && processed[i].startsWith('> ')) {
-        quoteLines.push(processInlineMath(processed[i].slice(2), opts))
-        i++
+      while (tIdx < tokens.length && tokens[tIdx].startsWith('> ')) {
+        const line = tokens[tIdx++]
+        if (!line.match(/^%%PLACEHOLDER_/)) quoteLines.push(processInlineMarkdown(line.slice(2), opts))
       }
       html += `<blockquote>${quoteLines.join('<br>')}</blockquote>`
-      i--
       continue
     }
-
-    if (line === '---' || line === '***') {
+    if (token === '---' || token === '***') {
       html += '<hr>'
+      tIdx++
       continue
     }
-
-    if (line.startsWith('---[')) {
-      const m = line.match(/^---\[(.+?)\]\((.+?)\)/)
+    if (token.startsWith('---[')) {
+      const m = token.match(/^---\[(.+?)\]\((.+?)\)/)
       if (m) {
         html += `<div class="divider"><span>${escapeHtml(m[1])}</span></div>`
+        tIdx++
         continue
       }
     }
-
-    if (line.trim()) {
-      html += `<p>${processInlineMarkdown(line, opts)}</p>`
+    if (token.trim()) {
+      html += `<p>${processInlineMarkdown(token, opts)}</p>`
     } else {
       html += '<br>'
     }
+    tIdx++
+  }
+
+  // Phase 3: 恢复占位符
+  for (let i = 0; i < placeholders.length; i++) {
+    html = html.replace(`%%PLACEHOLDER_${i}%%`, placeholders[i])
   }
 
   return html
