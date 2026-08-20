@@ -244,8 +244,9 @@ function renderMarkdownRaw(text: string, opts?: RenderOptions): string {
 
 export function renderMarkdown(text: string, opts?: RenderOptions): string {
   const rawHtml = renderMarkdownRaw(text, opts)
-  const inlineProcessed = processInlineMarkdown(rawHtml, { ...opts })
-  return DOMPurify.sanitize(inlineProcessed, { ALLOWED_TAGS: ['h1','h2','h3','h4','h5','h6','strong','em','del','u','sub','sup','a','p','br','ul','ol','li','blockquote','hr','pre','code','img','table','thead','tbody','tr','th','td','span','div','section','aside','details','summary','kbd'], ALLOWED_ATTR: ['href','src','alt','class','id','title','target','rel','style','data-lang','data-theme','width','height','checked','disabled','readonly','name','value','pattern','placeholder','min','max','step','multiple','required','open','colspan','rowspan','for','tabindex','spellcheck','translate','draggable','contenteditable','inputmode','autocapitalize','autocomplete','autofocus','maxlength','size','sandbox','frameborder','allowfullscreen','loading','decoding','fetchpriority','ping','sizes','srcset','usemap','start','reversed','type'] })
+  // Phase 2 已经对非代码行做了行内格式化，只对代码块外部分额外处理
+  // 避免再次处理代码块内容导致占位符或 <code> 标签被破坏
+  return DOMPurify.sanitize(rawHtml, { ALLOWED_TAGS: ['h1','h2','h3','h4','h5','h6','strong','em','del','u','sub','sup','a','p','br','ul','ol','li','blockquote','hr','pre','code','img','table','thead','tbody','tr','th','td','span','div','section','aside','details','summary','kbd'], ALLOWED_ATTR: ['href','src','alt','class','id','title','target','rel','style','data-lang','data-theme','width','height','checked','disabled','readonly','name','value','pattern','placeholder','min','max','step','multiple','required','open','colspan','rowspan','for','tabindex','spellcheck','translate','draggable','contenteditable','inputmode','autocapitalize','autocomplete','autofocus','maxlength','size','sandbox','frameborder','allowfullscreen','loading','decoding','fetchpriority','ping','sizes','srcset','usemap','start','reversed','type'] })
 }
 
 export function applyKaTeX(container: HTMLElement): void {
