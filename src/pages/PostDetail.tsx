@@ -34,7 +34,7 @@ import SocialLinks from '../components/SocialLinks'
 import RevisionHistory from '../components/RevisionHistory'
 import ImageLightbox from '../components/ImageLightbox'
 import type { LightboxImage } from '../components/ImageLightbox'
-import { renderMarkdown, applyKaTeX, langLabel } from '../utils/markdown'
+import { renderMarkdown, applyKaTeX, setupCodeBlockCopy } from '../utils/markdown'
 import Prism from 'prismjs'
 import 'katex/dist/katex.min.css'
 
@@ -539,46 +539,7 @@ export default function PostDetail() {
   useEffect(() => {
     if (!post) return
     Prism.highlightAll()
-    document.querySelectorAll('.article__body pre.code-block').forEach(pre => {
-      // 已处理过则跳过
-      if (pre.parentElement?.classList.contains('code-block-wrap')) return
-      const langAttr = pre.getAttribute('data-lang') || ''
-      const codeEl = pre.querySelector('code')
-      const langClass = codeEl?.className.match(/language-([\w-]+)/)
-      const lang = langAttr || (langClass ? langClass[1] : '') || 'text'
-
-      // 包裹容器
-      const wrap = document.createElement('div')
-      wrap.className = 'code-block-wrap'
-      // 头部栏：语言标签 + 复制按钮
-      const header = document.createElement('div')
-      header.className = 'code-block-header'
-      const langSpan = document.createElement('span')
-      langSpan.className = 'code-block-lang'
-      langSpan.textContent = langLabel(lang)
-      const copyBtn = document.createElement('button')
-      copyBtn.type = 'button'
-      copyBtn.className = 'code-block-copy'
-      copyBtn.textContent = '复制'
-      copyBtn.setAttribute('aria-label', '复制代码')
-      copyBtn.onclick = async () => {
-        const code = pre.querySelector('code')
-        if (!code) return
-        try {
-          await navigator.clipboard.writeText(code.textContent || '')
-          copyBtn.textContent = '已复制'
-        } catch {
-          copyBtn.textContent = '复制失败'
-        }
-        setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
-      }
-      header.appendChild(langSpan)
-      header.appendChild(copyBtn)
-      wrap.appendChild(header)
-      // 把 pre 移入容器
-      pre.parentNode?.insertBefore(wrap, pre)
-      wrap.appendChild(pre)
-    })
+    setupCodeBlockCopy(document.querySelector('.article__body') as HTMLElement)
   }, [post])
 
   // KaTeX 数学公式渲染

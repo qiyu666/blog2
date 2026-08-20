@@ -18,7 +18,7 @@ import 'prismjs/components/prism-yaml'
 import 'prismjs/components/prism-markdown'
 import type { Post } from '../types'
 import { getSharedPostByToken } from '../api'
-import { renderMarkdown } from '../utils/markdown'
+import { renderMarkdown, applyKaTeX, applyPrism, setupCodeBlockCopy } from '../utils/markdown'
 import SEO from '../components/SEO'
 
 export default function SharedPost() {
@@ -47,6 +47,12 @@ export default function SharedPost() {
   useEffect(() => {
     if (!post) return
     Prism.highlightAll()
+    const body = document.querySelector('.article__body') as HTMLElement
+    if (body) {
+      applyKaTeX(body)
+      applyPrism(body)
+      setupCodeBlockCopy(body)
+    }
   }, [post])
 
   if (loading) return <div className="loading">加载中</div>

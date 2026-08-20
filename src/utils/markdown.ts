@@ -112,8 +112,7 @@ function processBlockMath(lines: string[]): string[] {
 }
 
 function buildCodeBlockHTML(code: string, lang: string): string {
-  const langLabel = lang || 'text'
-  return `<pre class="code-block"><div class="code-block__header"><span class="code-block__lang">${escapeHtml(langLabel)}</span><button class="code-block__copy" onclick="navigator.clipboard.writeText(this.closest('.code-block').querySelector('code').textContent)">复制</button></div><code class="language-${escapeHtml(lang)}">${escapeHtml(code)}</code></pre>`
+  return `<pre class="code-block" data-lang="${escapeHtml(lang)}"><code class="language-${escapeHtml(lang)}">${escapeHtml(code)}</code></pre>`
 }
 
 function renderMarkdownRaw(text: string, opts?: RenderOptions): string {
@@ -276,6 +275,45 @@ export function applyPrism(container: HTMLElement): void {
     if (lang && Prism.languages[lang]) {
       el.innerHTML = Prism.highlight(el.textContent || '', Prism.languages[lang], lang)
     }
+  })
+}
+
+export function setupCodeBlockCopy(container: HTMLElement): void {
+  container.querySelectorAll<HTMLPreElement>('pre.code-block').forEach((pre) => {
+    if (pre.parentElement?.classList.contains('code-block-wrap')) return
+    const langAttr = pre.getAttribute('data-lang') || ''
+    const langClass = pre.querySelector('code')?.className.match(/language-([\w-]+)/)
+    const lang = langAttr || (langClass ? langClass[1] : '') || 'text'
+    const displayName = langLabel(lang)
+
+    const wrap = document.createElement('div')
+    wrap.className = 'code-block-wrap'
+    const header = document.createElement('div')
+    header.className = 'code-block-header'
+    const langSpan = document.createElement('span')
+    langSpan.className = 'code-block-lang'
+    langSpan.textContent = displayName
+    const copyBtn = document.createElement('button')
+    copyBtn.type = 'button'
+    copyBtn.className = 'code-block-copy'
+    copyBtn.textContent = '复制'
+    copyBtn.setAttribute('aria-label', '复制代码')
+    copyBtn.onclick = async () => {
+      const code = pre.querySelector('code')
+      if (!code) return
+      try {
+        await navigator.clipboard.writeText(code.textContent || '')
+        copyBtn.textContent = '已复制'
+      } catch {
+        copyBtn.textContent = '复制失败'
+      }
+      setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
+    }
+    header.appendChild(langSpan)
+    header.appendChild(copyBtn)
+    wrap.appendChild(header)
+    pre.parentNode?.insertBefore(wrap, pre)
+    wrap.appendChild(pre)
   })
 }
 

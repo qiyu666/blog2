@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useEffect } from 'react'
-import { renderMarkdown, applyKaTeX, applyPrism } from '../utils/markdown'
+import { renderMarkdown, applyKaTeX, applyPrism, setupCodeBlockCopy } from '../utils/markdown'
 import 'katex/dist/katex.min.css'
 
 interface Props {
@@ -30,6 +30,7 @@ export default function MarkdownEditor({
     if (!el) return
     applyKaTeX(el)
     applyPrism(el)
+    setupCodeBlockCopy(el)
   }, [html])
 
   /** 在当前光标位置插入/包裹文本 */
