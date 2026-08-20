@@ -132,7 +132,7 @@ function renderMarkdownRaw(text: string, opts?: RenderOptions): string {
   let inCodeBlock = false
   let codeBuffer = ''
   let codeLang = ''
-  const fenceRE = /^ ```/
+  const fenceRE = /^[ \t]*```/
 
   for (let i = 0; i < processed.length; i++) {
     const line = processed[i]
