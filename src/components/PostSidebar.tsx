@@ -78,6 +78,7 @@ export default function PostSidebar({ post }: PostSidebarProps) {
     .filter(Boolean);
 
   return (
+    <>
     <aside className="post-sidebar">
       {/* 作者信息卡片 */}
       <div className="post-sidebar__card">
@@ -246,5 +247,6 @@ export default function PostSidebar({ post }: PostSidebarProps) {
         </div>
       </div>
     )}
+    </>
   );
 }
