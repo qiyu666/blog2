@@ -538,8 +538,10 @@ export default function PostDetail() {
   // Prism 语法高亮 + 代码块头部（语言标签 + 复制按钮）
   useEffect(() => {
     if (!post) return
+    const body = document.querySelector('.article__body') as HTMLElement | null
+    if (!body) return
     Prism.highlightAll()
-    setupCodeBlockCopy(document.querySelector('.article__body') as HTMLElement)
+    setupCodeBlockCopy(body)
   }, [post])
 
   // KaTeX 数学公式渲染
