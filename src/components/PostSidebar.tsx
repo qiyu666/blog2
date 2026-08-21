@@ -10,6 +10,7 @@ interface PostSidebarProps {
 
 export default function PostSidebar({ post }: PostSidebarProps) {
   const [authorPosts, setAuthorPosts] = useState<Post[]>([]);
+  const [tippingOpen, setTippingOpen] = useState(false)
   const [authorBio, setAuthorBio] = useState('');
   const [authorSocial, setAuthorSocial] = useState<{
     social_github?: string;
@@ -21,6 +22,10 @@ export default function PostSidebar({ post }: PostSidebarProps) {
     social_email?: string;
     social_facebook?: string;
     social_whatsapp?: string;
+  } | null>(null);
+  const [authorTipping, setAuthorTipping] = useState<{
+    tipping_wechat_qr?: string;
+    tipping_alipay_qr?: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -46,6 +51,10 @@ export default function PostSidebar({ post }: PostSidebarProps) {
             social_email: profile.user.social_email,
             social_facebook: profile.user.social_facebook,
             social_whatsapp: profile.user.social_whatsapp,
+          });
+          setAuthorTipping({
+            tipping_wechat_qr: profile.user.tipping_wechat_qr,
+            tipping_alipay_qr: profile.user.tipping_alipay_qr,
           });
         })
         .catch(() => ''),
@@ -104,7 +113,7 @@ export default function PostSidebar({ post }: PostSidebarProps) {
         </div>
         {authorSocial && (
           <div className="post-sidebar__social">
-            <SocialLinks user={authorSocial} size="sm" />
+            <SocialLinks user={authorSocial} size="sm" onTip={() => setTippingOpen(true)} />
           </div>
         )}
       </div>
@@ -211,5 +220,31 @@ export default function PostSidebar({ post }: PostSidebarProps) {
         </div>
       </div>
     </aside>
+    {tippingOpen && (
+      <div className="tipping-dialog-overlay" onClick={() => setTippingOpen(false)}>
+        <div className="tipping-dialog" onClick={(e) => e.stopPropagation()}>
+          <button className="tipping-dialog__close" onClick={() => setTippingOpen(false)}>×</button>
+          <h2 className="tipping-dialog__title">请作者喝杯奶茶 🧋</h2>
+          <p className="tipping-dialog__hint">扫码支持作者，感谢您！</p>
+          <div className="tipping-dialog__qrs">
+            {authorTipping?.tipping_wechat_qr && (
+              <div className="tipping-dialog__qr">
+                <img src={authorTipping.tipping_wechat_qr} alt="微信打赏" className="tipping-dialog__qr-img" />
+                <span className="tipping-dialog__qr-label">微信打赏</span>
+              </div>
+            )}
+            {authorTipping?.tipping_alipay_qr && (
+              <div className="tipping-dialog__qr">
+                <img src={authorTipping.tipping_alipay_qr} alt="支付宝打赏" className="tipping-dialog__qr-img" />
+                <span className="tipping-dialog__qr-label">支付宝打赏</span>
+              </div>
+            )}
+            {!authorTipping?.tipping_wechat_qr && !authorTipping?.tipping_alipay_qr && (
+              <p className="tipping-dialog__empty">作者暂未设置打赏方式</p>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
   );
 }
