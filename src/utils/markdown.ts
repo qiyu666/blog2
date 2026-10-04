@@ -8,6 +8,12 @@ import 'prismjs/components/prism-css'
 import 'prismjs/components/prism-json'
 import 'prismjs/components/prism-sql'
 import 'prismjs/components/prism-markup'
+// prism-php 的 before/after-tokenize 钩子无条件访问
+// Prism.languages['markup-templating']，若不先加载该组件，
+// 任何 Prism.highlight 调用都会抛
+// "Cannot read properties of undefined (reading 'tokenizePlaceholders')"，
+// 导致包含文章页/编辑器在内的页面整体崩溃。
+import 'prismjs/components/prism-markup-templating'
 import 'prismjs/components/prism-java'
 import 'prismjs/components/prism-c'
 import 'prismjs/components/prism-cpp'

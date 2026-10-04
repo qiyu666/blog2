@@ -540,7 +540,13 @@ export default function PostDetail() {
     if (!post) return
     const body = document.querySelector('.article__body') as HTMLElement | null
     if (!body) return
-    Prism.highlightAll()
+    // 包裹 Prism 高亮：prism-php 组件若缺失 markup-templating 依赖，
+    // highlight 会抛 TypeError 把整个页面带进 500 错误边界，这里兜底。
+    try {
+      Prism.highlightAll()
+    } catch (err) {
+      console.warn('[prism] 语法高亮失败:', err)
+    }
     setupCodeBlockCopy(body)
   }, [post])
 
