@@ -1420,7 +1420,7 @@ export default function PostDetail() {
               </>
             )}
             <span className="article__meta-divider">·</span>
-            <span>约 {estimateReadingTime(post.content)} 分钟</span>
+            <span className="article__reading-time">约 {estimateReadingTime(post.content)} 分钟</span>
             {post.scheduled_at && (
               <>
                 <span className="article__meta-divider">·</span>

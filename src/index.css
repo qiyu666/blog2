@@ -1817,13 +1817,16 @@ input, textarea, select {
 
 .article__back-link-wrap {
   max-width: 700px;
+  width: 100%;
   margin: 0 auto;
   padding: 0 var(--space-md);
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm);
   flex-wrap: wrap;
+  overflow-wrap: anywhere;
 }
 
 /* ===== 字体大小调节 ===== */
@@ -1835,6 +1838,9 @@ input, textarea, select {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 999px;
+  flex-wrap: wrap;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .article__font-btn {
@@ -2160,6 +2166,7 @@ input, textarea, select {
   padding-top: var(--space-md);
   border-top: 1px solid var(--line-soft);
   position: relative;
+  overflow-wrap: anywhere;
 }
 
 .article__meta::before {
@@ -2227,6 +2234,7 @@ input, textarea, select {
 .article__online {
   display: inline-flex;
   align-items: center;
+  white-space: nowrap;
   gap: 4px;
   font-size: 0.8125rem;
   color: var(--text-soft, #666);
@@ -2247,6 +2255,11 @@ input, textarea, select {
   0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
   70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
   100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+.article__reading-time {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* 密码保护 */
@@ -13763,6 +13776,16 @@ a.profile-stat {
   .article__meta {
     flex-wrap: wrap;
     gap: var(--space-2);
+  }
+
+  .article__meta .article__online,
+  .article__meta .article__pvuv {
+    display: none;
+  }
+
+  /* 窄屏下 meta 行的分隔符改为纵向省略号，避免横向溢出 */
+  .article__meta {
+    justify-content: flex-start;
   }
 
   .article__body {
