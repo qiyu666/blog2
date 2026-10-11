@@ -2608,7 +2608,44 @@ input, textarea, select {
   color: var(--ink-soft);
   font-weight: 400;
   letter-spacing: -0.005em;
-  word-spacing: 0.02em;
+}
+
+/* 正文横向溢出防护：
+   - 移动端禁用两端对齐（中文 justify 在无断点段落会被撑宽导致横向溢出）
+   - 长 URL / 连续文本强制换行
+   - 代码块内部横向滚动而非撑破视口 */
+.article__body p,
+.article__body li,
+.article__body blockquote {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+@media (max-width: 768px) {
+  .article__body p,
+  .article__body li,
+  .article__body blockquote {
+    text-align: start;
+  }
+
+  .article__body a {
+    word-break: break-all;
+    overflow-wrap: anywhere;
+  }
+
+  .article__body pre,
+  .article__body .code-block-wrap,
+  .article__body .code-block {
+    max-width: 100%;
+    overflow-x: auto;
+    box-sizing: border-box;
+  }
+
+  .article__body table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
 }
 
 .article__body > p:first-of-type::first-letter {
@@ -2667,6 +2704,26 @@ input, textarea, select {
   margin-bottom: 1.5rem;
   text-align: justify;
   hyphens: auto;
+}
+
+/* 移动端：中文两端对齐（justify）在窄屏下会因无空格断点产生横向溢出，
+   改为 natural 对齐 + 强制换行，杜绝"必须手动缩小才能看全" */
+@media (max-width: 768px) {
+  .article__body p {
+    text-align: start;
+  }
+
+  /* 标题/摘要/正文容器加 box-sizing，确保 700px 上限在 390px 视口下
+     配合父级 width:100% 正确收窄，不再顶满右缘溢出 */
+  .article,
+  .article__header,
+  .article__title,
+  .article__excerpt,
+  .article__body,
+  .article__footer {
+    width: 100%;
+    box-sizing: border-box;
+  }
 }
 
 .article__body ul,
@@ -14180,6 +14237,25 @@ a.profile-stat {
 
   .category-card__name {
     font-size: 0.95rem;
+  }
+
+  /* 小屏文章容器强制按视口收窄，避免 700px 上限在 390px 下顶满右缘溢出 */
+  .article,
+  .article__header,
+  .article__title,
+  .article__excerpt,
+  .article__body,
+  .article__footer,
+  .article__back-link-wrap,
+  .post-layout,
+  .post-main {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box;
+  }
+
+  .article__body {
+    padding: 0 var(--space-3);
   }
 }
 
